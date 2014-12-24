@@ -55,8 +55,6 @@ typedef struct sys_mbox *sys_mbox_t;
 struct sys_thread;
 typedef struct sys_thread * sys_thread_t;
 
-#include "netif/sio.h"
-
 /* include SIO driver before anything else, this way we never
  * load lwip/sio.h before netif/sio.h in order to prevent prototypes
  * redefinition.
