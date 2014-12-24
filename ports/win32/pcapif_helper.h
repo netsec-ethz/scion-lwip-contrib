@@ -1,6 +1,9 @@
-#ifndef __PCAPIF_HELPER_H__
-#define __PCAPIF_HELPER_H__
+#ifndef LWIP_PCAPIF_HELPER_H
+#define LWIP_PCAPIF_HELPER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct pcapifh_linkstate;
 
@@ -15,4 +18,8 @@ enum pcapifh_link_event pcapifh_linkstate_get(struct pcapifh_linkstate* state);
 void pcapifh_linkstate_close(struct pcapifh_linkstate* state);
 
 
-#endif /* __PCAPIF_HELPER_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* LWIP_PCAPIF_HELPER_H */

@@ -38,9 +38,7 @@
 
 #define GETCWD(path, len)             GetCurrentDirectoryA(len, path)
 #define CHDIR(path)                   SetCurrentDirectoryA(path)
-
-#define NEWLINE     "\r\n"
-#define NEWLINE_LEN 2
+#define CHDIR_SUCCEEDED(ret)          (ret == TRUE)
 
 #else
 
@@ -57,8 +55,12 @@
 
 #define GETCWD(path, len)             getcwd(path, len)
 #define CHDIR(path)                   chdir(path)
+#define CHDIR_SUCCEEDED(ret)          (ret == 0)
 
 #endif
+
+#define NEWLINE     "\r\n"
+#define NEWLINE_LEN 2
 
 /* define this to get the header variables we use to build HTTP headers */
 #define LWIP_HTTPD_DYNAMIC_HEADERS 1
@@ -98,6 +100,7 @@ int file_write_http_header(FILE *data_file, const char *filename, int file_size,
 int file_put_ascii(FILE *file, const char *ascii_string, int len, int *i);
 int s_put_ascii(char *buf, const char *ascii_string, int len, int *i);
 void concat_files(const char *file1, const char *file2, const char *targetfile);
+int check_path(char* path, size_t size);
 
 static unsigned char file_buffer_raw[COPY_BUFSIZE];
 /* 5 bytes per char + 3 bytes per line */
@@ -116,10 +119,22 @@ unsigned char precalcChksum = 0;
 struct file_entry* first_file = NULL;
 struct file_entry* last_file = NULL;
 
+static void print_usage(void)
+{
+  printf(" Usage: htmlgen [targetdir] [-s] [-i] [-f:<filename>]" NEWLINE NEWLINE);
+  printf("   targetdir: relative or absolute path to files to convert" NEWLINE);
+  printf("   switch -s: toggle processing of subdirectories (default is on)" NEWLINE);
+  printf("   switch -e: exclude HTTP header from file (header is created at runtime, default is off)" NEWLINE);
+  printf("   switch -11: include HTTP 1.1 header (1.0 is default)" NEWLINE);
+  printf("   switch -nossi: no support for SSI (cannot calculate Content-Length for SSI)" NEWLINE);
+  printf("   switch -c: precalculate checksums for all pages (default is off)" NEWLINE);
+  printf("   switch -f: target filename (default is \"fsdata.c\")" NEWLINE);
+  printf("   if targetdir not specified, htmlgen will attempt to" NEWLINE);
+  printf("   process files in subdirectory 'fs'" NEWLINE);
+}
+
 int main(int argc, char *argv[])
 {
-  FIND_T fInfo;
-  FIND_RET_T fret;
   char path[MAX_PATH_LEN];
   char appPath[MAX_PATH_LEN];
   FILE *data_file;
@@ -138,6 +153,9 @@ int main(int argc, char *argv[])
 
   strcpy(path, "fs");
   for(i = 1; i < argc; i++) {
+    if (argv[i] == NULL) {
+      continue;
+    }
     if (argv[i][0] == '-') {
       if (strstr(argv[i], "-s")) {
         processSubs = 0;
@@ -150,31 +168,36 @@ int main(int argc, char *argv[])
       } else if (strstr(argv[i], "-c")) {
         precalcChksum = 1;
       } else if((argv[i][1] == 'f') && (argv[i][2] == ':')) {
-        strcpy(targetfile, &argv[i][3]);
+        strncpy(targetfile, &argv[i][3], sizeof(targetfile) - 1);
+        targetfile[sizeof(targetfile) - 1] = 0;
         printf("Writing to file \"%s\"\n", targetfile);
+      } else if ((strstr(argv[i], "-?")) || (strstr(argv[i], "-h"))) {
+        print_usage();
+        exit(0);
       }
+    } else if ((argv[i][0] == '/') && (argv[i][1] == '?') && (argv[i][2] == 0)) {
+      print_usage();
+      exit(0);
     } else {
-      strcpy(path, argv[i]);
+      strncpy(path, argv[i], sizeof(path)-1);
+      path[sizeof(path)-1] = 0;
     }
   }
 
-  /* if command line param or subdir named 'fs' not found spout usage verbiage */
-  fret = FINDFIRST_DIR(path, &fInfo);
-  if (!FINDFIRST_SUCCEEDED(fret)) {
-    /* if no subdir named 'fs' (or the one which was given) exists, spout usage verbiage */
-    printf(" Failed to open directory \"%s\"." NEWLINE NEWLINE, path);
-    printf(" Usage: htmlgen [targetdir] [-s] [-i] [-f:<filename>]" NEWLINE NEWLINE);
-    printf("   targetdir: relative or absolute path to files to convert" NEWLINE);
-    printf("   switch -s: toggle processing of subdirectories (default is on)" NEWLINE);
-    printf("   switch -e: exclude HTTP header from file (header is created at runtime, default is off)" NEWLINE);
-    printf("   switch -11: include HTTP 1.1 header (1.0 is default)" NEWLINE);
-    printf("   switch -nossi: no support for SSI (cannot calculate Content-Length for SSI)" NEWLINE);
-    printf("   switch -c: precalculate checksums for all pages (default is off)" NEWLINE);
-    printf("   switch -f: target filename (default is \"fsdata.c\")" NEWLINE);
-    printf("   if targetdir not specified, htmlgen will attempt to" NEWLINE);
-    printf("   process files in subdirectory 'fs'" NEWLINE);
+  if(!check_path(path, sizeof(path))) {
+    printf("Invalid path: \"%s\"." NEWLINE, path);
     exit(-1);
   }
+
+  GETCWD(appPath, MAX_PATH_LEN);
+  /* if command line param or subdir named 'fs' not found spout usage verbiage */
+  if (!CHDIR_SUCCEEDED(CHDIR(path))) {
+    /* if no subdir named 'fs' (or the one which was given) exists, spout usage verbiage */
+    printf(" Failed to open directory \"%s\"." NEWLINE NEWLINE, path);
+    print_usage();
+    exit(-1);
+  }
+  CHDIR(appPath);
 
   printf("HTTP %sheader will %s statically included." NEWLINE,
     (includeHttpHeader ? (useHttp11 ? "1.1 " : "1.0 ") : ""),
@@ -188,7 +211,6 @@ int main(int argc, char *argv[])
     printf("..." NEWLINE NEWLINE);
   }
 
-  GETCWD(appPath, MAX_PATH_LEN);
   data_file = fopen("fsdata.tmp", "wb");
   if (data_file == NULL) {
     printf("Failed to create file \"fsdata.tmp\"\n");
@@ -197,6 +219,7 @@ int main(int argc, char *argv[])
   struct_file = fopen("fshdr.tmp", "wb");
   if (struct_file == NULL) {
     printf("Failed to create file \"fshdr.tmp\"\n");
+    fclose(data_file);
     exit(-1);
   }
 
@@ -227,8 +250,12 @@ int main(int argc, char *argv[])
   concat_files("fsdata.tmp", "fshdr.tmp", targetfile);
 
   /* if succeeded, delete the temporary files */
-  remove("fsdata.tmp");
-  remove("fshdr.tmp"); 
+  if (remove("fsdata.tmp") != 0) {
+    printf("Warning: failed to delete fsdata.tmp\n");
+  }
+  if (remove("fshdr.tmp") != 0) {
+    printf("Warning: failed to delete fshdr.tmp\n");
+  }
 
   printf(NEWLINE "Processed %d files - done." NEWLINE NEWLINE, filesProcessed);
 
@@ -239,6 +266,29 @@ int main(int argc, char *argv[])
   }
 
   return 0;
+}
+
+int check_path(char* path, size_t size)
+{
+  size_t slen;
+  if (path[0] == 0) {
+    /* empty */
+    return 0;
+  }
+  slen = strlen(path);
+  if (slen >= size) {
+    /* not NULL-terminated */
+    return 0;
+  }
+  while ((slen > 0) && ((path[slen] == '\\') || (path[slen] == '/'))) {
+    /* path should not end with trailing backslash */
+    path[slen] = 0;
+    slen--;
+  }
+  if (slen == 0) {
+    return 0;
+  }
+  return 1;
 }
 
 static void copy_file(const char *filename_in, FILE *fout)
@@ -276,26 +326,34 @@ int process_sub(FILE *data_file, FILE *struct_file)
   FIND_T fInfo;
   FIND_RET_T fret;
   int filesProcessed = 0;
-  char oldSubdir[MAX_PATH_LEN];
 
   if (processSubs) {
     /* process subs recursively */
-    strcpy(oldSubdir, curSubdir);
+    size_t sublen = strlen(curSubdir);
+    size_t freelen = sizeof(curSubdir) - sublen - 1;
+    LWIP_ASSERT("sublen < sizeof(curSubdir)", sublen < sizeof(curSubdir));
     fret = FINDFIRST_DIR("*", &fInfo);
     if (FINDFIRST_SUCCEEDED(fret)) {
       do {
         const char *curName = FIND_T_FILENAME(fInfo);
-        if (curName == NULL) continue;
-        if (curName[0] == '.') continue;
-        if (strcmp(curName, "CVS") == 0) continue;
-        if (!FIND_T_IS_DIR(fInfo)) continue;
-        CHDIR(curName);
-        strcat(curSubdir, "/");
-        strcat(curSubdir, curName);
-        printf(NEWLINE "processing subdirectory %s/..." NEWLINE, curSubdir);
-        filesProcessed += process_sub(data_file, struct_file);
-        CHDIR("..");
-        strcpy(curSubdir, oldSubdir);
+        if ((curName[0] == '.') || (strcmp(curName, "CVS") == 0)) {
+          continue;
+        }
+        if (!FIND_T_IS_DIR(fInfo)) {
+          continue;
+        }
+        if (freelen > 0) {
+           CHDIR(curName);
+           strncat(curSubdir, "/", freelen);
+           strncat(curSubdir, curName, freelen - 1);
+           curSubdir[sizeof(curSubdir) - 1] = 0;
+           printf(NEWLINE "processing subdirectory %s/..." NEWLINE, curSubdir);
+           filesProcessed += process_sub(data_file, struct_file);
+           CHDIR("..");
+           curSubdir[sublen] = 0;
+        } else {
+           printf("WARNING: cannot process sub due to path length restrictions: \"%s/%s\"\n", curSubdir, curName);
+        }
       } while (FINDNEXT_SUCCEEDED(FINDNEXT(fret, &fInfo)));
     }
   }
@@ -339,6 +397,10 @@ void process_file_data(const char *filename, FILE *data_file)
   size_t len, written, i, src_off=0;
 
   source_file = fopen(filename, "rb");
+  if (source_file == NULL) {
+    printf("Failed to open file \"%s\"\n", filename);
+    exit(-1);
+  }
 
   do {
     size_t off = 0;
@@ -376,7 +438,7 @@ int write_checksums(FILE *struct_file, const char *filename, const char *varname
 
   memset(file_buffer_raw, 0xab, sizeof(file_buffer_raw));
   f = fopen(filename, "rb");
-  if (f == INVALID_HANDLE_VALUE) {
+  if (f == NULL) {
     printf("Failed to open file \"%s\"\n", filename);
     exit(-1);
   }
@@ -536,7 +598,7 @@ int file_write_http_header(FILE *data_file, const char *filename, int file_size,
 {
   int i = 0;
   int response_type = HTTP_HDR_OK;
-  int file_type = HTTP_HDR_DEFAULT_TYPE;
+  const char* file_type;
   const char *cur_string;
   size_t cur_len;
   int written = 0;
@@ -600,16 +662,19 @@ int file_write_http_header(FILE *data_file, const char *filename, int file_size,
   }
 
   file_ext = filename;
-  while(strstr(file_ext, ".") != NULL) {
-    file_ext = strstr(file_ext, ".");
-    file_ext++;
+  if (file_ext != NULL) {
+    while(strstr(file_ext, ".") != NULL) {
+      file_ext = strstr(file_ext, ".");
+      file_ext++;
+    }
   }
   if((file_ext == NULL) || (*file_ext == 0)) {
     printf("failed to get extension for file \"%s\", using default.\n", filename);
+    file_type = HTTP_HDR_DEFAULT_TYPE;
   } else {
     for(j = 0; j < NUM_HTTP_HEADERS; j++) {
       if(!strcmp(file_ext, g_psHTTPHeaders[j].extension)) {
-        file_type = g_psHTTPHeaders[j].headerIndex;
+        file_type = g_psHTTPHeaders[j].content_type;
         break;
       }
     }
@@ -663,7 +728,7 @@ int file_write_http_header(FILE *data_file, const char *filename, int file_size,
     }
   }
 
-  cur_string = g_psHTTPHeaderStrings[file_type];
+  cur_string = file_type;
   cur_len = strlen(cur_string);
   fprintf(data_file, NEWLINE "/* \"%s\" (%d bytes) */" NEWLINE, cur_string, cur_len);
   written += file_put_ascii(data_file, cur_string, cur_len, &i);

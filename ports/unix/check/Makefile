@@ -33,9 +33,8 @@ CODEDIR=../../../../lwip
 LWIPDIR=$(CODEDIR)/src
 
 LDFLAGS:=$(LDFLAGS) -lcheck
-CFLAGS:=$(CFLAGS) -I/usr/include/check -I$(LWIPDIR)/../test/unit \
-	-I$(LWIPDIR)/include -I$(LWIPDIR)/include/ipv4 \
-	-I$(LWIPDIR)/include/ipv6 -Iunix/include -I. -I../include
+CFLAGS:=$(CFLAGS) -DLWIP_UNIX_EMPTY_ASSERT -I/usr/include/check -I$(LWIPDIR)/../test/unit \
+	-I$(LWIPDIR)/include -Iunix/include -I. -I../include
 
 COREFILES=$(LWIPDIR)/core/mem.c $(LWIPDIR)/core/memp.c $(LWIPDIR)/core/netif.c \
 	$(LWIPDIR)/core/pbuf.c $(LWIPDIR)/core/raw.c \
@@ -55,7 +54,7 @@ LWIPOBJS=$(LWIPFILES:.c=.o)
 
 TESTDIR=$(CODEDIR)/test/unit
 TESTFILES=$(TESTDIR)/lwip_unittests.c $(TESTDIR)/udp/test_udp.c $(TESTDIR)/etharp/test_etharp.c $(TESTDIR)/tcp/tcp_helper.c \
-	$(TESTDIR)/tcp/test_tcp_oos.c $(TESTDIR)/tcp/test_tcp.c $(TESTDIR)/core/test_mem.c $(TESTDIR)/dhcp/test_dhcp.c
+	$(TESTDIR)/tcp/test_tcp_oos.c $(TESTDIR)/tcp/test_tcp.c $(TESTDIR)/core/test_mem.c $(TESTDIR)/dhcp/test_dhcp.c $(TESTDIR)/core/test_pbuf.c
 TESTOBJS=$(TESTFILES:.c=.o)
 
 %.o: %.c Makefile $(TESTDIR)/lwipopts.h

@@ -29,8 +29,8 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef __MINTAPIF_H__
-#define __MINTAPIF_H__
+#ifndef LWIP_MINTAPIF_H
+#define LWIP_MINTAPIF_H
 
 #include "lwip/netif.h"
 
@@ -49,7 +49,6 @@ enum mintapif_signal {
 err_t mintapif_init(struct netif *netif);
 int mintapif_select(struct netif *netif);
 enum mintapif_signal mintapif_wait(struct netif *netif, u16_t time);
-
 void  mintapif_input(struct netif *netif);
 
-#endif /* __MINTAPIF_H__ */
+#endif /* LWIP_MINTAPIF_H */

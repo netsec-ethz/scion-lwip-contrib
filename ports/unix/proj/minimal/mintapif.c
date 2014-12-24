@@ -79,8 +79,9 @@ low_level_init(struct netif *netif)
 {
   struct mintapif *mintapif;
   char buf[1024];
+  int ret;
 
-  mintapif = netif->state;
+  mintapif = (struct mintapif *)netif->state;
   
   /* Obtain MAC address from network interface. */
   mintapif->ethaddr->addr[0] = 0xf0;
@@ -129,7 +130,14 @@ low_level_init(struct netif *netif)
   }
 
   
-  system(buf);
+  ret = system(buf);
+  if (ret < 0) {
+    perror("ifconfig failed");
+    exit(1);
+  }
+  if (ret != 0) {
+    printf("ifconfig returned %d\n", ret);
+  }
 
   mintapif->lasttime = 0;
 
@@ -154,7 +162,7 @@ low_level_output(struct netif *netif, struct pbuf *p)
   char *bufptr;
   int written;
 
-  mintapif = netif->state;
+  mintapif = (struct mintapif *)netif->state;
   
   /* initiate transfer(); */
   
@@ -198,7 +206,7 @@ low_level_input(struct netif *netif)
   char *bufptr;
   struct mintapif *mintapif;
 
-  mintapif = netif->state;
+  mintapif = (struct mintapif *)netif->state;
 
   /* Obtain the size of the packet and put it into the "len"
      variable. */
@@ -274,7 +282,7 @@ mintapif_init(struct netif *netif)
 {
   struct mintapif *mintapif;
     
-  mintapif = mem_malloc(sizeof(struct mintapif));
+  mintapif = (struct mintapif *)mem_malloc(sizeof(struct mintapif));
   if (mintapif == NULL)
   {
     LWIP_DEBUGF(NETIF_DEBUG, ("cs8900_init: out of memory for mintapif\n"));
@@ -321,7 +329,7 @@ mintapif_wait(struct netif *netif, u16_t time)
   int ret;
   struct mintapif *mintapif;
 
-  mintapif = netif->state;
+  mintapif = (struct mintapif *)netif->state;
 
   while (1) {
   
@@ -360,7 +368,7 @@ mintapif_select(struct netif *netif)
   struct timeval tv;
   struct mintapif *mintapif;
 
-  mintapif = netif->state;
+  mintapif = (struct mintapif *)netif->state;
 
   tv.tv_sec = 0;
   tv.tv_usec = 0; /* usec_to; */

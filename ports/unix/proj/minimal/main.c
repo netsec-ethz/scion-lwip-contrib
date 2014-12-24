@@ -106,7 +106,7 @@ static struct option longopts[] = {
 };
 #define NUM_OPTS ((sizeof(longopts) / sizeof(struct option)) - 1)
 
-void usage(void)
+static void usage(void)
 {
   unsigned char i;
    

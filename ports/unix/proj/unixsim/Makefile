@@ -35,17 +35,17 @@ CC=gcc
 #To compile for linux: make ARCH=linux
 #To compile for cygwin: make ARCH=cygwin
 ARCH=unix
-CFLAGS=-g -Wall -D$(ARCH) -DIPv4 -DLWIP_DEBUG -pedantic -Werror \
+CFLAGS=-g -Wall -D$(ARCH) -DLWIP_DEBUG -pedantic -Werror \
 	-Wparentheses -Wsequence-point -Wswitch-default \
 	-Wextra -Wundef -Wshadow -Wpointer-arith -Wbad-function-cast \
 	-Wc++-compat -Wwrite-strings -Wold-style-definition \
-	-Wmissing-prototypes -Wredundant-decls -Wnested-externs
+	-Wmissing-prototypes -Wredundant-decls -Wnested-externs -Wno-address
 # not used for now but interesting:
 # -Wpacked
 # -Wunreachable-code
 # -ansi
 # -std=c89
-LDFLAGS=-lpthread -lutil
+LDFLAGS=-pthread -lutil
 CONTRIBDIR=../../../..
 LWIPARCH=$(CONTRIBDIR)/ports/unix
 ARFLAGS=rs
@@ -57,8 +57,7 @@ LWIPDIR=$(CONTRIBDIR)/../lwip/src
 CFLAGS:=$(CFLAGS) \
 	-I. -I$(CONTRIBDIR)/apps/httpserver_raw -I$(CONTRIBDIR)/apps/shell \
 	-I$(CONTRIBDIR)/apps/tcpecho -I$(CONTRIBDIR)/apps/udpecho \
-	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/ipv4 \
-	-I$(LWIPDIR)/include/ipv6 -I$(LWIPDIR)
+	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
 COREFILES=$(LWIPDIR)/core/def.c $(LWIPDIR)/core/dhcp.c $(LWIPDIR)/core/dns.c \
@@ -89,12 +88,19 @@ APIFILES=$(LWIPDIR)/api/api_lib.c $(LWIPDIR)/api/api_msg.c $(LWIPDIR)/api/err.c 
 NETIFFILES=$(LWIPDIR)/netif/etharp.c $(LWIPDIR)/netif/slipif.c
 
 # NETIFFILES: Add PPP netif
-NETIFFILES+=$(LWIPDIR)/netif/ppp/auth.c $(LWIPDIR)/netif/ppp/chap.c \
-	$(LWIPDIR)/netif/ppp/chpms.c $(LWIPDIR)/netif/ppp/fsm.c \
-	$(LWIPDIR)/netif/ppp/ipcp.c $(LWIPDIR)/netif/ppp/lcp.c \
-	$(LWIPDIR)/netif/ppp/magic.c $(LWIPDIR)/netif/ppp/md5.c \
-	$(LWIPDIR)/netif/ppp/pap.c $(LWIPDIR)/netif/ppp/ppp.c \
-	$(LWIPDIR)/netif/ppp/randm.c $(LWIPDIR)/netif/ppp/vj.c \
+NETIFFILES+=$(LWIPDIR)/netif/ppp/auth.c $(LWIPDIR)/netif/ppp/ccp.c \
+	$(LWIPDIR)/netif/ppp/chap-md5.c $(LWIPDIR)/netif/ppp/chap_ms.c \
+	$(LWIPDIR)/netif/ppp/chap-new.c $(LWIPDIR)/netif/ppp/demand.c \
+	$(LWIPDIR)/netif/ppp/eap.c $(LWIPDIR)/netif/ppp/ecp.c \
+	$(LWIPDIR)/netif/ppp/eui64.c $(LWIPDIR)/netif/ppp/fsm.c \
+	$(LWIPDIR)/netif/ppp/ipcp.c $(LWIPDIR)/netif/ppp/ipv6cp.c \
+	$(LWIPDIR)/netif/ppp/lcp.c $(LWIPDIR)/netif/ppp/magic.c \
+	$(LWIPDIR)/netif/ppp/multilink.c $(LWIPDIR)/netif/ppp/ppp.c \
+	$(LWIPDIR)/netif/ppp/pppcrypt.c $(LWIPDIR)/netif/ppp/pppoe.c \
+	$(LWIPDIR)/netif/ppp/pppol2tp.c $(LWIPDIR)/netif/ppp/upap.c \
+	$(LWIPDIR)/netif/ppp/utils.c $(LWIPDIR)/netif/ppp/vj.c \
+	$(LWIPDIR)/netif/ppp/polarssl/des.c $(LWIPDIR)/netif/ppp/polarssl/md4.c \
+	$(LWIPDIR)/netif/ppp/polarssl/md5.c $(LWIPDIR)/netif/ppp/polarssl/sha1.c \
 	$(LWIPARCH)/netif/sio.c
 
 # ARCHFILES: Architecture specific files.

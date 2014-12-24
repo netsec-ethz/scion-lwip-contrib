@@ -95,8 +95,9 @@
 #define HTTPD_DEBUG         LWIP_DBG_OFF
 #endif
 
-/** Set this to 1 and add the next line to lwippools.h to use a memp pool
- * for allocating struct http_state instead of the heap:
+/** Set this to 1, set MEMP_USE_CUSTOM_POOLS to 1 and add the next line to
+ * lwippools.h to use a memp pool for allocating struct http_state instead of
+ * the heap:
  *
  * LWIP_MEMPOOL(HTTPD_STATE, 20, 100, "HTTPD_STATE")
  */
@@ -123,13 +124,13 @@
 #endif
 
 /** Priority for tcp pcbs created by HTTPD (very low by default).
- *  Lower priorities get killed first when running out of memroy.
+ *  Lower priorities get killed first when running out of memory.
  */
 #ifndef HTTPD_TCP_PRIO
 #define HTTPD_TCP_PRIO                      TCP_PRIO_MIN
 #endif
 
-/** Set this to 1 to enabled timing each file sent */
+/** Set this to 1 to enable timing each file sent */
 #ifndef LWIP_HTTPD_TIMING
 #define LWIP_HTTPD_TIMING                   0
 #endif
@@ -254,6 +255,20 @@
 #define HTTP_IS_TAG_VOLATILE(ptr) TCP_WRITE_FLAG_COPY
 #endif
 #endif /* LWIP_HTTPD_SSI */
+
+/* By default, the httpd is limited to send 2*pcb->mss to keep resource usage low
+   when http is not an important protocol in the device. */
+#ifndef HTTPD_LIMIT_SENDING_TO_2MSS
+#define HTTPD_LIMIT_SENDING_TO_2MSS 1
+#endif
+
+/* Define this to a function that returns the maximum amount of data to enqueue.
+   The function have this signature: u16_t fn(struct tcp_pcb* pcb); */
+#ifndef HTTPD_MAX_WRITE_LEN
+#if HTTPD_LIMIT_SENDING_TO_2MSS
+#define HTTPD_MAX_WRITE_LEN(pcb)    (2 * tcp_mss(pcb))
+#endif
+#endif
 
 /* Return values for http_send_*() */
 #define HTTP_DATA_TO_SEND_BREAK    2
@@ -386,6 +401,7 @@ static err_t http_close_or_abort_conn(struct tcp_pcb *pcb, struct http_state *hs
 static err_t http_find_file(struct http_state *hs, const char *uri, int is_09);
 static err_t http_init_file(struct http_state *hs, struct fs_file *file, int is_09, const char *uri, u8_t tag_check);
 static err_t http_poll(void *arg, struct tcp_pcb *pcb);
+static u8_t http_check_eof(struct tcp_pcb *pcb, struct http_state *hs);
 #if LWIP_HTTPD_FS_ASYNC_READ
 static void http_continue(void *connection);
 #endif /* LWIP_HTTPD_FS_ASYNC_READ */
@@ -441,11 +457,16 @@ http_kill_oldest_connection(u8_t ssi_required)
   struct http_state *hs = http_connections;
   struct http_state *hs_free_next = NULL;
   while(hs && hs->next) {
+#if LWIP_HTTPD_SSI
     if (ssi_required) {
       if (hs->next->ssi != NULL) {
         hs_free_next = hs;
       }
-    } else {
+    } else
+#else /* LWIP_HTTPD_SSI */
+    LWIP_UNUSED_ARG(ssi_required);
+#endif /* LWIP_HTTPD_SSI */
+    {
       hs_free_next = hs;
     }
     hs = hs->next;
@@ -560,6 +581,12 @@ http_state_eof(struct http_state *hs)
     hs->ssi = NULL;
   }
 #endif /* LWIP_HTTPD_SSI */
+#if LWIP_HTTPD_SUPPORT_REQUESTLIST
+  if (hs->req) {
+    pbuf_free(hs->req);
+    hs->req = NULL;
+  }
+#endif /* LWIP_HTTPD_SUPPORT_REQUESTLIST */
 }
 
 /** Free a struct http_state.
@@ -606,37 +633,50 @@ http_state_free(struct http_state *hs)
 static err_t
 http_write(struct tcp_pcb *pcb, const void* ptr, u16_t *length, u8_t apiflags)
 {
-   u16_t len;
-   err_t err;
-   LWIP_ASSERT("length != NULL", length != NULL);
-   len = *length;
-   if (len == 0) {
-     return ERR_OK;
-   }
-   do {
-     LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("Trying go send %d bytes\n", len));
-     err = tcp_write(pcb, ptr, len, apiflags);
-     if (err == ERR_MEM) {
-       if ((tcp_sndbuf(pcb) == 0) ||
-           (tcp_sndqueuelen(pcb) >= TCP_SND_QUEUELEN)) {
-         /* no need to try smaller sizes */
-         len = 1;
-       } else {
-         len /= 2;
-       }
-       LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, 
-                   ("Send failed, trying less (%d bytes)\n", len));
-     }
-   } while ((err == ERR_MEM) && (len > 1));
+  u16_t len, max_len;
+  err_t err;
+  LWIP_ASSERT("length != NULL", length != NULL);
+  len = *length;
+  if (len == 0) {
+    return ERR_OK;
+  }
+  /* We cannot send more data than space available in the send buffer. */
+  max_len = tcp_sndbuf(pcb);
+  if (max_len < len) {
+    len = max_len;
+  }
+#ifdef HTTPD_MAX_WRITE_LEN
+  /* Additional limitation: e.g. don't enqueue more than 2*mss at once */
+  max_len = HTTPD_MAX_WRITE_LEN(pcb);
+  if(len > max_len) {
+    len = max_len;
+  }
+#endif /* HTTPD_MAX_WRITE_LEN */
+  do {
+    LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("Trying go send %d bytes\n", len));
+    err = tcp_write(pcb, ptr, len, apiflags);
+    if (err == ERR_MEM) {
+      if ((tcp_sndbuf(pcb) == 0) ||
+        (tcp_sndqueuelen(pcb) >= TCP_SND_QUEUELEN)) {
+          /* no need to try smaller sizes */
+          len = 1;
+      } else {
+        len /= 2;
+      }
+      LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, 
+        ("Send failed, trying less (%d bytes)\n", len));
+    }
+  } while ((err == ERR_MEM) && (len > 1));
 
-   if (err == ERR_OK) {
-     LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("Sent %d bytes\n", len));
-   } else {
-     LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("Send failed with err %d (\"%s\")\n", err, lwip_strerr(err)));
-   }
+  if (err == ERR_OK) {
+    LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("Sent %d bytes\n", len));
+    *length = len;
+  } else {
+    LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("Send failed with err %d (\"%s\")\n", err, lwip_strerr(err)));
+    *length = 0;
+  }
 
-   *length = len;
-   return err;
+  return err;
 }
 
 /**
@@ -840,8 +880,8 @@ get_tag_insert(struct http_state *hs)
 #define UNKNOWN_TAG1_LEN  18
 #define UNKNOWN_TAG2_TEXT "***</b>"
 #define UNKNOWN_TAG2_LEN  7
-  len = LWIP_MIN(strlen(ssi->tag_name),
-    LWIP_HTTPD_MAX_TAG_INSERT_LEN - (UNKNOWN_TAG1_LEN + UNKNOWN_TAG2_LEN));
+  len = LWIP_MIN(sizeof(ssi->tag_name), LWIP_MIN(strlen(ssi->tag_name),
+    LWIP_HTTPD_MAX_TAG_INSERT_LEN - (UNKNOWN_TAG1_LEN + UNKNOWN_TAG2_LEN)));
   MEMCPY(ssi->tag_insert, UNKNOWN_TAG1_TEXT, UNKNOWN_TAG1_LEN);
   MEMCPY(&ssi->tag_insert[UNKNOWN_TAG1_LEN], ssi->tag_name, len);
   MEMCPY(&ssi->tag_insert[UNKNOWN_TAG1_LEN + len], UNKNOWN_TAG2_TEXT, UNKNOWN_TAG2_LEN);
@@ -918,8 +958,7 @@ get_http_headers(struct http_state *pState, char *pszURI)
     for(iLoop = 0; (iLoop < NUM_HTTP_HEADERS) && pszExt; iLoop++) {
       /* Have we found a matching extension? */
       if(!strcmp(g_psHTTPHeaders[iLoop].extension, pszExt)) {
-        pState->hdrs[2] =
-          g_psHTTPHeaderStrings[g_psHTTPHeaders[iLoop].headerIndex];
+        pState->hdrs[2] = g_psHTTPHeaders[iLoop].content_type;
         break;
       }
     }
@@ -941,7 +980,7 @@ get_http_headers(struct http_state *pState, char *pszURI)
     /* Did we find a matching extension? */
     if(iLoop == NUM_HTTP_HEADERS) {
       /* No - use the default, plain text file type. */
-      pState->hdrs[2] = g_psHTTPHeaderStrings[HTTP_HDR_DEFAULT_TYPE];
+      pState->hdrs[2] = HTTP_HDR_DEFAULT_TYPE;
     }
 
     /* Set up to send the first header string. */
@@ -972,6 +1011,7 @@ http_send_headers(struct tcp_pcb *pcb, struct http_state *hs)
   while(len && (hs->hdr_index < NUM_FILE_HDR_STRINGS) && sendlen) {
     const void *ptr;
     u16_t old_sendlen;
+    u8_t apiflags;
     /* How much do we have to send from the current header? */
     hdrlen = (u16_t)strlen(hs->hdrs[hs->hdr_index]);
 
@@ -979,10 +1019,14 @@ http_send_headers(struct tcp_pcb *pcb, struct http_state *hs)
     sendlen = (len < (hdrlen - hs->hdr_pos)) ? len : (hdrlen - hs->hdr_pos);
 
     /* Send this amount of data or as much as we can given memory
-    * constraints. */
+     * constraints. */
     ptr = (const void *)(hs->hdrs[hs->hdr_index] + hs->hdr_pos);
     old_sendlen = sendlen;
-    err = http_write(pcb, ptr, &sendlen, HTTP_IS_HDR_VOLATILE(hs, ptr));
+    apiflags = HTTP_IS_HDR_VOLATILE(hs, ptr);
+    if (hs->hdr_index < NUM_FILE_HDR_STRINGS - 1) {
+      apiflags |= TCP_WRITE_FLAG_MORE;
+    }
+    err = http_write(pcb, ptr, &sendlen, apiflags);
     if ((err == ERR_OK) && (old_sendlen != sendlen)) {
       /* Remember that we added some more data to be transmitted. */
       data_to_send = HTTP_DATA_TO_SEND_CONTINUE;
@@ -1001,6 +1045,13 @@ http_send_headers(struct tcp_pcb *pcb, struct http_state *hs)
       hs->hdr_index++;
       hs->hdr_pos = 0;
     }
+  }
+
+  if ((hs->hdr_index >= NUM_FILE_HDR_STRINGS) && (hs->file == NULL)) {
+    /* When we are at the end of the headers, check for data to send
+     * instead of waiting for ACK from remote side to continue
+     * (which would happen when sending files from async read). */
+    http_check_eof(pcb, hs);
   }
   /* If we get here and there are still header bytes to send, we send
    * the header information we just wrote immediately. If there are no
@@ -1023,8 +1074,12 @@ http_send_headers(struct tcp_pcb *pcb, struct http_state *hs)
 static u8_t
 http_check_eof(struct tcp_pcb *pcb, struct http_state *hs)
 {
+  int bytes_left;
 #if LWIP_HTTPD_DYNAMIC_FILE_READ
   int count;
+#ifdef HTTPD_MAX_WRITE_LEN
+  int max_write_len;
+#endif /* HTTPD_MAX_WRITE_LEN */
 #endif /* LWIP_HTTPD_DYNAMIC_FILE_READ */
 
   /* Do we have a valid file handle? */
@@ -1033,7 +1088,8 @@ http_check_eof(struct tcp_pcb *pcb, struct http_state *hs)
     http_eof(pcb, hs);
     return 0;
   }
-  if (fs_bytes_left(hs->handle) <= 0) {
+  bytes_left = fs_bytes_left(hs->handle);
+  if (bytes_left <= 0) {
     /* We reached the end of the file so this request is done. */
     LWIP_DEBUGF(HTTPD_DEBUG, ("End of file.\n"));
     http_eof(pcb, hs);
@@ -1045,8 +1101,18 @@ http_check_eof(struct tcp_pcb *pcb, struct http_state *hs)
     /* Yes - get the length of the buffer */
     count = hs->buf_len;
   } else {
-    /* We don't have a send buffer so allocate one up to 2mss bytes long. */
-    count = 2 * tcp_mss(pcb);
+    /* We don't have a send buffer so allocate one now */
+    count = tcp_sndbuf(pcb);
+    if(bytes_left < count) {
+      count = bytes_left;
+    }
+#ifdef HTTPD_MAX_WRITE_LEN
+    /* Additional limitation: e.g. don't enqueue more than 2*mss at once */
+    max_write_len = HTTPD_MAX_WRITE_LEN(pcb);
+    if (count > max_write_len) {
+      count = max_write_len;
+    }
+#endif /* HTTPD_MAX_WRITE_LEN */
     do {
       hs->buf = (char*)mem_malloc((mem_size_t)count);
       if (hs->buf != NULL) {
@@ -1109,24 +1175,11 @@ http_send_data_nonssi(struct tcp_pcb *pcb, struct http_state *hs)
 {
   err_t err;
   u16_t len;
-  u16_t mss;
   u8_t data_to_send = 0;
 
   /* We are not processing an SHTML file so no tag checking is necessary.
    * Just send the data as we received it from the file. */
-
-  /* We cannot send more data than space available in the send
-     buffer. */
-  if (tcp_sndbuf(pcb) < hs->left) {
-    len = tcp_sndbuf(pcb);
-  } else {
-    len = (u16_t)hs->left;
-    LWIP_ASSERT("hs->left did not fit into u16_t!", (len == hs->left));
-  }
-  mss = tcp_mss(pcb);
-  if (len > (2 * mss)) {
-    len = 2 * mss;
-  }
+  len = (u16_t)LWIP_MIN(hs->left, 0xffff);
 
   err = http_write(pcb, hs->file, &len, HTTP_IS_DATA_VOLATILE(hs));
   if (err == ERR_OK) {
@@ -1149,7 +1202,6 @@ http_send_data_ssi(struct tcp_pcb *pcb, struct http_state *hs)
 {
   err_t err = ERR_OK;
   u16_t len;
-  u16_t mss;
   u8_t data_to_send = 0;
 
   struct http_ssi_state *ssi = hs->ssi;
@@ -1164,19 +1216,7 @@ http_send_data_ssi(struct tcp_pcb *pcb, struct http_state *hs)
 
   /* Do we have remaining data to send before parsing more? */
   if(ssi->parsed > hs->file) {
-    /* We cannot send more data than space available in the send
-       buffer. */
-    if (tcp_sndbuf(pcb) < (ssi->parsed - hs->file)) {
-      len = tcp_sndbuf(pcb);
-    } else {
-      LWIP_ASSERT("Data size does not fit into u16_t!",
-                  (ssi->parsed - hs->file) <= 0xffff);
-      len = (u16_t)(ssi->parsed - hs->file);
-    }
-    mss = tcp_mss(pcb);
-    if(len > (2 * mss)) {
-      len = 2 * mss;
-    }
+    len = (u16_t)LWIP_MIN(ssi->parsed - hs->file, 0xffff);
 
     err = http_write(pcb, hs->file, &len, HTTP_IS_DATA_VOLATILE(hs));
     if (err == ERR_OK) {
@@ -1196,7 +1236,6 @@ http_send_data_ssi(struct tcp_pcb *pcb, struct http_state *hs)
   /* We have sent all the data that was already parsed so continue parsing
    * the buffer contents looking for SSI tags. */
   while((ssi->parse_left) && (err == ERR_OK)) {
-    /* @todo: somewhere in this loop, 'len' should grow again... */
     if (len == 0) {
       return data_to_send;
     }
@@ -1344,14 +1383,10 @@ http_send_data_ssi(struct tcp_pcb *pcb, struct http_state *hs)
             if (ssi->tag_end > hs->file) {
               /* How much of the data can we send? */
 #if LWIP_HTTPD_SSI_INCLUDE_TAG
-              if(len > ssi->tag_end - hs->file) {
-                len = (u16_t)(ssi->tag_end - hs->file);
-              }
+              len = (u16_t)LWIP_MIN(ssi->tag_end - hs->file, 0xffff);
 #else /* LWIP_HTTPD_SSI_INCLUDE_TAG*/
-              if(len > ssi->tag_started - hs->file) {
-                /* we would include the tag in sending */
-                len = (u16_t)(ssi->tag_started - hs->file);
-              }
+              /* we would include the tag in sending */
+              len = (u16_t)LWIP_MIN(ssi->tag_started - hs->file, 0xffff);
 #endif /* LWIP_HTTPD_SSI_INCLUDE_TAG*/
 
               err = http_write(pcb, hs->file, &len, HTTP_IS_DATA_VOLATILE(hs));
@@ -1390,15 +1425,11 @@ http_send_data_ssi(struct tcp_pcb *pcb, struct http_state *hs)
         if(ssi->tag_end > hs->file) {
           /* How much of the data can we send? */
 #if LWIP_HTTPD_SSI_INCLUDE_TAG
-          if(len > ssi->tag_end - hs->file) {
-            len = (u16_t)(ssi->tag_end - hs->file);
-          }
+          len = (u16_t)LWIP_MIN(ssi->tag_end - hs->file, 0xffff);
 #else /* LWIP_HTTPD_SSI_INCLUDE_TAG*/
           LWIP_ASSERT("hs->started >= hs->file", ssi->tag_started >= hs->file);
-          if (len > ssi->tag_started - hs->file) {
-            /* we would include the tag in sending */
-            len = (u16_t)(ssi->tag_started - hs->file);
-          }
+          /* we would include the tag in sending */
+          len = (u16_t)LWIP_MIN(ssi->tag_started - hs->file, 0xffff);
 #endif /* LWIP_HTTPD_SSI_INCLUDE_TAG*/
           if (len != 0) {
             err = http_write(pcb, hs->file, &len, HTTP_IS_DATA_VOLATILE(hs));
@@ -1432,9 +1463,7 @@ http_send_data_ssi(struct tcp_pcb *pcb, struct http_state *hs)
           if(ssi->tag_index < ssi->tag_insert_len) {
             /* We are sending the insert string itself. How much of the
              * insert can we send? */
-            if(len > (ssi->tag_insert_len - ssi->tag_index)) {
-              len = (ssi->tag_insert_len - ssi->tag_index);
-            }
+            len = (ssi->tag_insert_len - ssi->tag_index);
 
             /* Note that we set the copy flag here since we only have a
              * single tag insert buffer per connection. If we don't do
@@ -1471,18 +1500,7 @@ http_send_data_ssi(struct tcp_pcb *pcb, struct http_state *hs)
    * file data to send so send it now. In TAG_SENDING state, we've already
    * handled this so skip the send if that's the case. */
   if((ssi->tag_state != TAG_SENDING) && (ssi->parsed > hs->file)) {
-    /* We cannot send more data than space available in the send
-       buffer. */
-    if (tcp_sndbuf(pcb) < (ssi->parsed - hs->file)) {
-      len = tcp_sndbuf(pcb);
-    } else {
-      LWIP_ASSERT("Data size does not fit into u16_t!",
-                  (ssi->parsed - hs->file) <= 0xffff);
-      len = (u16_t)(ssi->parsed - hs->file);
-    }
-    if(len > (2 * tcp_mss(pcb))) {
-      len = 2 * tcp_mss(pcb);
-    }
+    len = (u16_t)LWIP_MIN(ssi->parsed - hs->file, 0xffff);
 
     err = http_write(pcb, hs->file, &len, HTTP_IS_DATA_VOLATILE(hs));
     if (err == ERR_OK) {
@@ -1683,7 +1701,11 @@ http_post_rxpbuf(struct http_state *hs, struct pbuf *p)
     hs->post_content_len_left -= p->tot_len;
   }
   err = httpd_post_receive_data(hs, p);
-  if ((err != ERR_OK) || (hs->post_content_len_left == 0)) {
+  if (err != ERR_OK) {
+    /* Ignore remaining content in case of application error */
+    hs->post_content_len_left = 0;
+  }
+  if (hs->post_content_len_left == 0) {
 #if LWIP_HTTPD_SUPPORT_POST && LWIP_HTTPD_POST_MANUAL_WND
     if (hs->unrecved_bytes != 0) {
        return ERR_OK;
@@ -1711,7 +1733,7 @@ http_post_rxpbuf(struct http_state *hs, struct pbuf *p)
  *         another err_t: Error parsing POST or denied by the application
  */
 static err_t
-http_post_request(struct pbuf **inp, struct http_state *hs,
+http_post_request(struct pbuf *inp, struct http_state *hs,
                   char *data, u16_t data_len, char *uri, char *uri_end)
 {
   err_t err;
@@ -1729,7 +1751,6 @@ http_post_request(struct pbuf **inp, struct http_state *hs,
       if (scontent_len_end != NULL) {
         int content_len;
         char *conten_len_num = scontent_len + HTTP_HDR_CONTENT_LEN_LEN;
-        *scontent_len_end = 0;
         content_len = atoi(conten_len_num);
         if (content_len > 0) {
           /* adjust length of HTTP header passed to application */
@@ -1742,7 +1763,7 @@ http_post_request(struct pbuf **inp, struct http_state *hs,
             http_post_response_filename, LWIP_HTTPD_POST_MAX_RESPONSE_URI_LEN, &post_auto_wnd);
           if (err == ERR_OK) {
             /* try to pass in data of the first pbuf(s) */
-            struct pbuf *q = *inp;
+            struct pbuf *q = inp;
             u16_t start_offset = hdr_len;
 #if LWIP_HTTPD_POST_MANUAL_WND
             hs->no_auto_wnd = !post_auto_wnd;
@@ -1752,14 +1773,9 @@ http_post_request(struct pbuf **inp, struct http_state *hs,
 
             /* get to the pbuf where the body starts */
             while((q != NULL) && (q->len <= start_offset)) {
-              struct pbuf *head = q;
               start_offset -= q->len;
               q = q->next;
-              /* free the head pbuf */
-              head->next = NULL;
-              pbuf_free(head);
             }
-            *inp = NULL;
             if (q != NULL) {
               /* hide the remaining HTTP header */
               pbuf_header(q, -(s16_t)start_offset);
@@ -1769,6 +1785,7 @@ http_post_request(struct pbuf **inp, struct http_state *hs,
                 hs->unrecved_bytes = q->tot_len;
               }
 #endif /* LWIP_HTTPD_POST_MANUAL_WND */
+              pbuf_ref(q);
               return http_post_rxpbuf(hs, q);
             } else {
               return ERR_OK;
@@ -1784,6 +1801,11 @@ http_post_request(struct pbuf **inp, struct http_state *hs,
         }
       }
     }
+    /* If we come here, headers are fully received (double-crlf), but Content-Length
+       was not included. Since this is currently the only supported method, we have
+       to fail in this case! */
+    LWIP_DEBUGF(HTTPD_DEBUG, ("Error when parsing Content-Length\n"));
+    return ERR_ARG;
   }
   /* if we come here, the POST is incomplete */
 #if LWIP_HTTPD_SUPPORT_REQUESTLIST
@@ -1864,12 +1886,12 @@ http_continue(void *connection)
  *         another err_t otherwise
  */
 static err_t
-http_parse_request(struct pbuf **inp, struct http_state *hs, struct tcp_pcb *pcb)
+http_parse_request(struct pbuf *inp, struct http_state *hs, struct tcp_pcb *pcb)
 {
   char *data;
   char *crlf;
   u16_t data_len;
-  struct pbuf *p = *inp;
+  struct pbuf *p = inp;
 #if LWIP_HTTPD_SUPPORT_REQUESTLIST
   u16_t clen;
 #endif /* LWIP_HTTPD_SUPPORT_REQUESTLIST */
@@ -1902,6 +1924,9 @@ http_parse_request(struct pbuf **inp, struct http_state *hs, struct tcp_pcb *pcb
     LWIP_DEBUGF(HTTPD_DEBUG, ("pbuf enqueued\n"));
     pbuf_cat(hs->req, p);
   }
+  /* increase pbuf ref counter as it is freed when we return but we want to
+     keep it on the req list */
+  pbuf_ref(p);
 
   if (hs->req->next != NULL) {
     data_len = LWIP_MIN(hs->req->tot_len, LWIP_HTTPD_MAX_REQ_LENGTH);
@@ -1984,9 +2009,9 @@ http_parse_request(struct pbuf **inp, struct http_state *hs, struct tcp_pcb *pcb
 #if LWIP_HTTPD_SUPPORT_POST
           if (is_post) {
 #if LWIP_HTTPD_SUPPORT_REQUESTLIST
-            struct pbuf **q = &hs->req;
+            struct pbuf *q = hs->req;
 #else /* LWIP_HTTPD_SUPPORT_REQUESTLIST */
-            struct pbuf **q = inp;
+            struct pbuf *q = inp;
 #endif /* LWIP_HTTPD_SUPPORT_REQUESTLIST */
             err = http_post_request(q, hs, data, data_len, uri, sp2);
             if (err != ERR_OK) {
@@ -2349,11 +2374,13 @@ http_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 #endif /* LWIP_HTTPD_SUPPORT_POST */
   {
     if (hs->handle == NULL) {
-      parsed = http_parse_request(&p, hs, pcb);
+      parsed = http_parse_request(p, hs, pcb);
       LWIP_ASSERT("http_parse_request: unexpected return value", parsed == ERR_OK
         || parsed == ERR_INPROGRESS ||parsed == ERR_ARG || parsed == ERR_USE);
     } else {
       LWIP_DEBUGF(HTTPD_DEBUG, ("http_recv: already sending data\n"));
+      /* already sending but still receiving data, we might want to RST here? */
+      pbuf_free(p);
     }
 #if LWIP_HTTPD_SUPPORT_REQUESTLIST
     if (parsed != ERR_INPROGRESS) {
@@ -2363,12 +2390,8 @@ http_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
         hs->req = NULL;
       }
     }
-#else /* LWIP_HTTPD_SUPPORT_REQUESTLIST */
-    if (p != NULL) {
-      /* pbuf not passed to application, free it now */
-      pbuf_free(p);
-    }
 #endif /* LWIP_HTTPD_SUPPORT_REQUESTLIST */
+    pbuf_free(p);
     if (parsed == ERR_OK) {
 #if LWIP_HTTPD_SUPPORT_POST
       if (hs->post_content_len_left == 0)
@@ -2451,11 +2474,15 @@ httpd_init_addr(ip_addr_t *local_addr)
 void
 httpd_init(void)
 {
+#if MEMP_MEM_MALLOC || MEM_USE_POOLS
 #if HTTPD_USE_MEM_POOL
   LWIP_ASSERT("memp_sizes[MEMP_HTTPD_STATE] >= sizeof(http_state)",
-     memp_sizes[MEMP_HTTPD_STATE] >= sizeof(http_state));
+     memp_sizes[MEMP_HTTPD_STATE] >= sizeof(struct http_state));
+#if LWIP_HTTPD_SSI
   LWIP_ASSERT("memp_sizes[MEMP_HTTPD_SSI_STATE] >= sizeof(http_ssi_state)",
-     memp_sizes[MEMP_HTTPD_SSI_STATE] >= sizeof(http_ssi_state));
+     memp_sizes[MEMP_HTTPD_SSI_STATE] >= sizeof(struct http_ssi_state));
+#endif
+#endif
 #endif
   LWIP_DEBUGF(HTTPD_DEBUG, ("httpd_init\n"));
 

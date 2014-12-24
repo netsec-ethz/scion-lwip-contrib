@@ -1,5 +1,5 @@
-#ifndef __SMTP_H__
-#define __SMTP_H__
+#ifndef LWIP_SMTP_H
+#define LWIP_SMTP_H
 
 #include "lwip/err.h"
 
@@ -60,8 +60,8 @@ err_t smtp_send_mail(const char *from, const char* to, const char* subject, cons
 err_t smtp_send_mail_static(const char *from, const char* to, const char* subject, const char* body,
                      smtp_result_fn callback_fn, void* callback_arg);
 void smtp_send_mail_int(void *arg);
-#if LWIP_DEBUG
+#ifdef LWIP_DEBUG
 const char* smtp_result_str(u8_t smtp_result);
 #endif
 
-#endif /* __SMTP_H__ */
+#endif /* LWIP_SMTP_H */

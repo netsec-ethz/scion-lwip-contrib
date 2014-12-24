@@ -34,6 +34,9 @@
  *
  */
 
+/* include the port-dependent configuration */
+#include "lwipcfg_msvc.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -69,12 +72,14 @@
 
 #include "netif/etharp.h"
 
-/* include the port-dependent configuration */
-#include "lwipcfg_msvc.h"
-
 /* For compatibility with old pcap */
 #ifndef PCAP_OPENFLAG_PROMISCUOUS
 #define PCAP_OPENFLAG_PROMISCUOUS     1
+#endif
+
+/** Set this to 0 to receive all multicast ethernet destination addresses */
+#ifndef PCAPIF_FILTER_GROUP_ADDRESSES
+#define PCAPIF_FILTER_GROUP_ADDRESSES 1
 #endif
 
 /* Define those to better describe your network interface.
@@ -113,6 +118,8 @@
 
 #endif /* PCAPIF_HANDLE_LINKSTATE */
 
+#define ETH_MIN_FRAME_LEN      60U
+#define ETH_MAX_FRAME_LEN      1518U
 
 #define ADAPTER_NAME_LEN       128
 #define ADAPTER_DESC_LEN       128
@@ -379,7 +386,7 @@ pcapif_init_adapter(int adapter_num, void *arg)
 #endif
                                errbuf);           /* error buffer */
   if (pa->adapter == NULL) {
-    printf("\nUnable to open the adapter. %s is not supported by WinPcap\n", d->name);
+    printf("\nUnable to open the adapter. %s is not supported by WinPcap\n", used_adapter->name);
     /* Free the device list */
     pcap_freealldevs(alldevs);
     free(pa);
@@ -479,6 +486,11 @@ pcapif_low_level_init(struct netif *netif)
   u8_t my_mac_addr[ETHARP_HWADDR_LEN] = LWIP_MAC_ADDR_BASE;
   int adapter_num = PACKET_LIB_ADAPTER_NR;
   struct pcapif_private *pa;
+#ifdef PACKET_LIB_GET_ADAPTER_NETADDRESS
+  ip_addr_t netaddr;
+#define GUID_LEN 128
+  char guid[GUID_LEN + 1];
+#endif /* PACKET_LIB_GET_ADAPTER_NETADDRESS */
 
   /* If 'state' is != NULL at this point, we assume it is an 'int' giving
      the index of the adapter to use (+ 1 because 0==NULL is invalid).
@@ -493,9 +505,6 @@ pcapif_low_level_init(struct netif *netif)
   }
 
 #ifdef PACKET_LIB_GET_ADAPTER_NETADDRESS
-  ip_addr_t netaddr;
-#define GUID_LEN 128
-  char guid[GUID_LEN + 1];
   memset(&guid, 0, sizeof(guid));
   PACKET_LIB_GET_ADAPTER_NETADDRESS(&netaddr);
   if (get_adapter_index_from_addr((struct in_addr *)&netaddr, guid, GUID_LEN) < 0) {
@@ -566,7 +575,7 @@ static err_t
 pcapif_low_level_output(struct netif *netif, struct pbuf *p)
 {
   struct pbuf *q;
-  unsigned char buffer[1520];
+  unsigned char buffer[ETH_MAX_FRAME_LEN + ETH_PAD_SIZE];
   unsigned char *buf = buffer;
   unsigned char *ptr;
   struct eth_hdr *ethhdr;
@@ -578,7 +587,7 @@ pcapif_low_level_output(struct netif *netif, struct pbuf *p)
 #endif
 
   /* initiate transfer */
-  if (p->len == p->tot_len) {
+  if ((p->len == p->tot_len) && (p->len >= ETH_MIN_FRAME_LEN + ETH_PAD_SIZE)) {
     /* no pbuf chain, don't have to copy -> faster */
     buf = &((unsigned char*)p->payload)[ETH_PAD_SIZE];
   } else {
@@ -604,6 +613,12 @@ pcapif_low_level_output(struct netif *netif, struct pbuf *p)
         ptr += q->len;
       }
     }
+  }
+
+  if (tot_len < ETH_MIN_FRAME_LEN) {
+    /* ensure minimal frame length */
+    memset(&buf[tot_len], 0, ETH_MIN_FRAME_LEN - tot_len);
+    tot_len = ETH_MIN_FRAME_LEN;
   }
 
   /* signal that packet should be sent */
@@ -639,9 +654,11 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
   struct eth_addr *dest = (struct eth_addr*)packet;
   struct eth_addr *src = dest + 1;
   int unicast;
+#if PCAPIF_FILTER_GROUP_ADDRESSES
   const u8_t bcast[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
   const u8_t ipv4mcast[] = {0x01, 0x00, 0x5e};
   const u8_t ipv6mcast[] = {0x33, 0x33};
+#endif /* PCAPIF_FILTER_GROUP_ADDRESSES */
 
   /* Don't let feedback packets through (limitation in winpcap?) */
   if(!memcmp(src, netif->hwaddr, ETHARP_HWADDR_LEN)) {
@@ -650,11 +667,16 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
   }
 
   /* MAC filter: only let my MAC or non-unicast through (pcap receives loopback traffic, too) */
-  unicast = ((dest->addr[0] & 0x01) == 0);  
+  unicast = ((dest->addr[0] & 0x01) == 0);
   if (memcmp(dest, &netif->hwaddr, ETHARP_HWADDR_LEN) &&
+#if PCAPIF_FILTER_GROUP_ADDRESSES
     (memcmp(dest, ipv4mcast, 3) || ((dest->addr[3] & 0x80) != 0)) && 
     memcmp(dest, ipv6mcast, 2) &&
-    memcmp(dest, bcast, 6)) {
+    memcmp(dest, bcast, 6)
+#else /* PCAPIF_FILTER_GROUP_ADDRESSES */
+     unicast
+#endif /* PCAPIF_FILTER_GROUP_ADDRESSES */
+    ) {
     /* don't update counters here! */
     return NULL;
   }
@@ -763,7 +785,7 @@ pcapif_init(struct netif *netif)
 #endif /* LWIP_NETIF_HOSTNAME */
 
   netif->mtu = 1500;
-  netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_IGMP;
+  netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET | NETIF_FLAG_IGMP;
   netif->hwaddr_len = ETHARP_HWADDR_LEN;
 
   NETIF_INIT_SNMP(netif, snmp_ifType_ethernet_csmacd, 100000000);

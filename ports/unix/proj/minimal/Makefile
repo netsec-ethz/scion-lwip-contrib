@@ -54,8 +54,9 @@ LWIPARCH=$(CONTRIBDIR)/ports/unix
 LWIPDIR=$(CONTRIBDIR)/../lwip/src
 
 CFLAGS:=$(CFLAGS) \
-	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/ipv4 \
-	-I$(LWIPDIR)/include/ipv6 -I. -I$(CONTRIBDIR)/apps/snmp_private_mib
+	-I$(LWIPDIR)/include -I$(LWIPARCH)/include \
+	-I. -I$(CONTRIBDIR)/apps/snmp_private_mib \
+	-I$(CONTRIBDIR)/apps/tcpecho_raw
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
 COREFILES=$(LWIPDIR)/core/def.c $(LWIPDIR)/core/dhcp.c $(LWIPDIR)/core/dns.c \
@@ -120,7 +121,7 @@ LWIPFILESW=$(wildcard $(LWIPFILES))
 LWIPOBJS=$(notdir $(LWIPFILESW:.c=.o))
 
 # APPFILES
-APPFILES=echo.c timer.c
+APPFILES=../../../../apps/tcpecho_raw/echo.c timer.c
 
 LWIPLIB=liblwip4.a
 APPLIB=liblwipapps.a

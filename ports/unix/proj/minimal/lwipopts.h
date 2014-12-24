@@ -35,8 +35,8 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-#ifndef __LWIPOPTS_H__
-#define __LWIPOPTS_H__
+#ifndef LWIP_LWIPOPTS_H
+#define LWIP_LWIPOPTS_H
 
 /*
    -----------------------------------------------
@@ -522,4 +522,4 @@
 #define TCP_MSS 100
 /* #define TCP_WND 8400 */
 
-#endif /* __LWIPOPTS_H__ */
+#endif /* LWIP_LWIPOPTS_H */
