@@ -1,9 +1,8 @@
 #ifndef SIO_UNIX_H
 #define SIO_UNIX_H
 
-#include "lwip/opt.h"
 #include "lwip/sys.h"
-/* #include "lwip/netif.h" */
+#include "lwip/netif.h"
 #include "netif/fifo.h"
 /*#include "netif/pppif.h"*/
 /* BAUDRATE is defined in sio.c as it is implementation specific */
