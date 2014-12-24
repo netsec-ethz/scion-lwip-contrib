@@ -33,6 +33,9 @@
 #include <unistd.h>
 #include <getopt.h>
 
+#include "netif/sio.h"
+
+#include "lwip/opt.h"
 #include "lwip/init.h"
 
 #include "lwip/debug.h"
@@ -60,8 +63,6 @@
 #include "private_mib.h"
 
 #include "lwip/tcpip.h"
-
-#include "netif/sio.h"
 
 /* (manual) host IP configuration */
 static ip_addr_t ipaddr, netmask, gw;
@@ -124,7 +125,7 @@ static void tcpip_init_done(void *arg)
   sys_sem_signal(&sem); /* Signal the waiting thread that the TCP/IP init is done. */
 }
 
-void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
+static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 	LWIP_UNUSED_ARG(ctx);
 
 	switch(err_code) {
@@ -204,15 +205,6 @@ void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 	} */
 }
 
-int myprintf(const char *format, ...) {
-  va_list args;
-  int n;
-  va_start(args, format);
-  n = vfprintf(stderr, format, args);
-  va_end(args);
-  return n;
-}
-
 #if 0
 u32_t sio_write(sio_fd_t fd, u8_t *data, u32_t len) {
   return write(to_pppd[1], data, len);
@@ -240,8 +232,8 @@ main(int argc, char **argv)
   int ch;
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
   sys_sem_t sem;
-  char *username = "essai", *password = "aon0viipheehooX";
-  char *username2 = "essai2", *password2 = "aon0viipheehooX";
+  const char *username = "essai", *password = "aon0viipheehooX";
+  const char *username2 = "essai2", *password2 = "aon0viipheehooX";
   ppp_pcb *ppp = NULL, *ppp2 = NULL;
 #if PPPOL2TP_SUPPORT
   ppp_pcb *pppl2tp = NULL;
@@ -441,10 +433,10 @@ main(int argc, char **argv)
 
     FD_ZERO(&fdset);
 
-    mintapif = netif.state;
+    mintapif = (struct mintapif *)netif.state;
     FD_SET(mintapif->fd, &fdset);
 
-    mintapif2 = netif2.state;
+    mintapif2 = (struct mintapif *)netif2.state;
     FD_SET(mintapif2->fd, &fdset);
 
     maxfd = LWIP_MAX(mintapif->fd, mintapif2->fd);

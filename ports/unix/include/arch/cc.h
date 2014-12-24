@@ -36,8 +36,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <limits.h>
-#include <stdio.h>
-#include <stdarg.h>
 
 #define LWIP_TIMEVAL_PRIVATE 0
 
@@ -58,10 +56,10 @@ typedef unsigned long mem_ptr_t;
 
 /* Define (sn)printf formatters for these lwIP types */
 #define X8_F  "02x"
-#define U16_F "d"
-#define S16_F "d"
-#define X16_F "x"
-#define U32_F "d"
+#define U16_F "hu"
+#define S16_F "hd"
+#define X16_F "hx"
+#define U32_F "u"
 #define S32_F "d"
 #define X32_F "x"
 
@@ -78,13 +76,11 @@ typedef unsigned long mem_ptr_t;
 #define PACK_STRUCT_BEGIN
 #define PACK_STRUCT_END
 
-int myprintf(const char *format, ...);
-
 /* prototypes for printf() and abort() */
 #include <stdio.h>
 #include <stdlib.h>
 /* Plaform specific diagnostic output */
-#define LWIP_PLATFORM_DIAG(x)	do {myprintf x;} while(0)
+#define LWIP_PLATFORM_DIAG(x)	do {printf x;} while(0)
 
 #ifdef LWIP_UNIX_EMPTY_ASSERT
 #define LWIP_PLATFORM_ASSERT(x)

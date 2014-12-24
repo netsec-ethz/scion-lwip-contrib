@@ -267,7 +267,7 @@ lwip_privmib_init(void)
   int i;
 #endif /* SENSORS_USE_FILES && SENSORS_SEARCH_FILES */
 
-  fprintf(stderr, "SNMP private MIB start, detecting sensors.\n");
+  printf("SNMP private MIB start, detecting sensors.\n");
 
 #if SENSORS_USE_FILES && SENSORS_SEARCH_FILES
   /* look for sensors in sensors directory */
