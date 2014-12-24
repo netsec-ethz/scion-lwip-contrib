@@ -1,5 +1,5 @@
-#ifndef SIO_H
-#define SIO_H
+#ifndef SIO_PORT_H
+#define SIO_PORT_H
 
 #include "lwip/opt.h"
 #include "lwip/sys.h"

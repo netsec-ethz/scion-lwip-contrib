@@ -39,7 +39,11 @@ ARCH=linux
 #CFLAGS=-g -Wall -pedantic -D$(ARCH) -DIPv4 -Os -fpack-struct -DLWIP_DEBUG -lpthread 
 #CFLAGS=-g -Wall -D$(ARCH) -DIPv4 -Os -fpack-struct -DLWIP_DEBUG -lpthread -ldl -lcrypt -DHAVE_PATHS_H -DIPX_CHANGE -DHAVE_MMAP -DCHAPMS=1 -DMPPE=1 -DHAS_SHADOW -DHAVE_CRYPT_H=1 -DUSE_CRYPT=1 -DHAVE_MULTILINK -DUSE_TDB=1 -DPLUGIN -DMAXOCTETS -DDESTDIR="/usr/local"
 #CFLAGS=-ggdb -Wall -pedantic -D$(ARCH) -DIPv4 -Os -DLWIP_DEBUG -DDEBUGALL -lpthread
-CFLAGS=-ggdb -Wall -pedantic -D$(ARCH) -DIPv4 -DLWIP_DEBUG -DDEBUGALL -lpthread -lutil
+CFLAGS=-ggdb -Wextra -Wall -pedantic -Wparentheses -Wsequence-point -Wswitch-default \
+	-Wextra -Wundef -Wshadow -Wpointer-arith -Wbad-function-cast \
+	-Wc++-compat -Wwrite-strings -Wold-style-definition \
+	-Wmissing-prototypes -Wredundant-decls -Wnested-externs -Wno-address \
+	-D$(ARCH) -DIPv4 -DLWIP_DEBUG -DDEBUGALL -lpthread -lutil
 ARFLAGS=rs
 
 CONTRIBDIR=../../../..
@@ -94,8 +98,7 @@ PPPFILES= $(LWIPDIR)/netif/ppp/magic.c \
   $(LWIPDIR)/netif/ppp/polarssl/des.c \
   $(LWIPDIR)/netif/ppp/eui64.c \
   $(LWIPDIR)/netif/ppp/ipv6cp.c \
-  $(LWIPDIR)/netif/ppp/pppol2tp.c \
-  $(LWIPDIR)/netif/ppp/pppos.c
+  $(LWIPDIR)/netif/ppp/pppol2tp.c
 
 #  $(LWIPDIR)/netif/ppp/vj.c \
 

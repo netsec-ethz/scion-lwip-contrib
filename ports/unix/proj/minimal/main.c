@@ -77,6 +77,8 @@ unsigned char debug_flags;
 int to_pppd[2], from_pppd[2];
 #endif
 
+struct netif netif;
+
 /* 'non-volatile' SNMP settings
   @todo: make these truly non-volatile */
 u8_t syscontact_str[255];
@@ -180,8 +182,15 @@ void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 		}
 	}
 
+	if(err_code == PPPERR_USER) {
+		printf("Destroying PPPoE and recreating\n");
+		ppp_free(pcb);
+		ppp_over_ethernet_create(pcb, &netif, NULL, NULL, ppp_link_status_cb, NULL);
+		ppp_open(pcb, 5);
+	}
+
 	if(err_code != PPPERR_NONE) {
-		ppp_open(pcb, 5); 
+		ppp_open(pcb, 5);
 /*		printf("ppp_free(pcb) = %d\n", ppp_free(pcb)); */
 /*		printf("ppp_delete(pcb) = %d\n", ppp_delete(pcb)); */
 		/* printf("ppp_open(pcb, 5) = %d\n", ppp_open(pcb, 5)); */
@@ -189,7 +198,7 @@ void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 
 /*	if(errCode != PPPERR_NONE) {
 		if(ppp_desc >= 0) {
-			//pppOverEthernetClose(ppp_desc);
+			pppOverEthernetClose(ppp_desc);
 			ppp_desc = -1;
 		}
 	} */
@@ -224,7 +233,6 @@ void sio_input(ppp_pcb *pcb) {
 int
 main(int argc, char **argv)
 {
-  struct netif netif;
   struct netif netif2;
 #if (NO_SYS == 1)
   sigset_t mask, oldmask, empty;
@@ -372,7 +380,7 @@ main(int argc, char **argv)
 #if PPPOS_SUPPORT
 	ser = sio_open(2);
 	fprintf(stderr, "SIO FD = %d\n", ser->fd);
-	sys_msleep(100); /* wait a little bit for forked pppd to be ready */
+	sys_msleep(300); /* wait a little bit for forked pppd to be ready */
 
 	pppapi_set_auth(ppps, PPPAUTHTYPE_PAP, username2, password2);
 	pppapi_over_serial_create(ppps, ser, ppp_link_status_cb, NULL);
@@ -393,6 +401,8 @@ main(int argc, char **argv)
 		/* pppapi_over_l2tp_open(pppl2tp, NULL, &l2tpserv, 1701, NULL, 0, ppp_link_status_cb, NULL); */
 	}
 #endif
+
+	pppapi_set_default(ppps);
 
 #if 0
 	/* start pppd */
@@ -441,7 +451,7 @@ main(int argc, char **argv)
 #if 0
     FD_SET(from_pppd[0], &fdset);
 #endif
-#if PPPOS_SUPPORT && !PPP_INPROC_OWNTHREAD
+#if PPPOS_SUPPORT
     if(ser) {
       FD_SET(ser->fd, &fdset);
       maxfd = LWIP_MAX(maxfd, ser->fd);
@@ -457,7 +467,7 @@ main(int argc, char **argv)
       if( FD_ISSET(from_pppd[0], &fdset) )
         sio_input(ppps);
 #endif
-#if PPPOS_SUPPORT && !PPP_INPROC_OWNTHREAD
+#if PPPOS_SUPPORT
       if(ppps && ser && FD_ISSET(ser->fd, &fdset) ) {
         u8_t buffer[128];
         int len;
@@ -481,6 +491,11 @@ main(int argc, char **argv)
 		/* pppapi_close(ppps); */
 		/* printf("pppapi_close(ppp) = %d\n", pppapi_close(ppp)); */
 	}
+#if 0
+	if( !(coin % 2000)) {
+		pppapi_close(ppp);
+	}
+#endif
   }
 
 #if (NO_SYS == 1)

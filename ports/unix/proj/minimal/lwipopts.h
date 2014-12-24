@@ -61,7 +61,7 @@
  *    4 byte alignment -> #define MEM_ALIGNMENT 4
  *    2 byte alignment -> #define MEM_ALIGNMENT 2
  */
-#define MEM_ALIGNMENT                   1
+#define MEM_ALIGNMENT                   4
 
 /**
  * MEM_SIZE: the size of the heap memory. If the application will send
@@ -162,7 +162,9 @@
 /**
  * PBUF_POOL_SIZE: the number of buffers in the pbuf pool. 
  */
-#define PBUF_POOL_SIZE                  32
+#define PBUF_POOL_SIZE                  64
+
+#define PBUF_POOL_BUFSIZE  512
 
 /*
    ---------------------------------
@@ -184,7 +186,7 @@
  * interfaces. If you are going to run lwIP on a device with only one network
  * interface, define this to 0.
  */
-#define IP_FORWARD                      0
+#define IP_FORWARD                      1
 
 /**
  * IP_OPTIONS: Defines the behavior for IP options.
@@ -487,14 +489,14 @@
 /**
  * VJ_SUPPORT==1: Support VJ header compression.
  */
-#define VJ_SUPPORT                      0
+#define VJ_SUPPORT                      1
 
 /**
  * PPP_MD5_RANDM==1: Use MD5 for better randomness.
  */
 #define PPP_MD5_RANDM			0
 
-#define LCP_ECHOINTERVAL		1
+#define LCP_ECHOINTERVAL		30
 #define LCP_MAXECHOFAILS		4
 
 #define PRINTPKT_SUPPORT		1
@@ -504,7 +506,7 @@
 #define PPP_SERVER 1
 
 #define MEMP_NUM_PPP_PCB 10
-#define MEMP_NUM_PPPOE_INTERFACES 10
+#define MEMP_NUM_PPPOE_INTERFACES 2
 
 #define PPP_INPROC_MULTITHREADED 1
 
@@ -517,7 +519,7 @@
 
 #define LWIP_NETIF_API 1
 
-#define TCP_MSS 1400
+#define TCP_MSS 100
 /* #define TCP_WND 8400 */
 
 #endif /* __LWIPOPTS_H__ */

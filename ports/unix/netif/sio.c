@@ -336,7 +336,7 @@ sio_status_t * sio_open( int devnum )
 #else
 			"noauth",
 #endif
-			"192.168.1.1:192.168.1.2",
+			"192.168.2.1:192.168.2.2",
 			NULL);
 		perror("execl pppd");
 		exit (1);
