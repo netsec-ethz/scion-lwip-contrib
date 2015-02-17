@@ -99,7 +99,8 @@ PPPFILES= $(LWIPDIR)/netif/ppp/magic.c \
   $(LWIPDIR)/netif/ppp/polarssl/des.c \
   $(LWIPDIR)/netif/ppp/eui64.c \
   $(LWIPDIR)/netif/ppp/ipv6cp.c \
-  $(LWIPDIR)/netif/ppp/pppol2tp.c
+  $(LWIPDIR)/netif/ppp/pppol2tp.c \
+  $(LWIPDIR)/netif/ppp/pppos.c
 
 #  $(LWIPDIR)/netif/ppp/vj.c \
 

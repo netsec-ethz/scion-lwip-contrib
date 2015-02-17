@@ -55,6 +55,9 @@
 #include "netif/etharp.h"
 #include "lwip/pppapi.h"
 #include "lwip/netifapi.h"
+#include "netif/ppp/pppos.h"
+#include "netif/ppp/pppoe.h"
+#include "netif/ppp/pppol2tp.h"
 
 #include "timer.h"
 #include <signal.h>
@@ -79,6 +82,7 @@ int to_pppd[2], from_pppd[2];
 #endif
 
 struct netif netif;
+const char *username = "essai", *password = "aon0viipheehooX";
 
 /* 'non-volatile' SNMP settings
   @todo: make these truly non-volatile */
@@ -173,8 +177,6 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 		}
 		case PPPERR_PROTOCOL: {        /* Failed to meet protocol. */
 			fprintf(stderr, "ppp_link_status_cb: PPPERR_PROTOCOL\n\r");
-/*			ppp_desc = pppapi_over_ethernet_open(&MACB_if, NULL, NULL, ppp_link_status_cb, NULL);
-			printf("ppp_desc = %d\n\r", ppp_desc); */
 			break;
 		}
 		default: {
@@ -184,10 +186,14 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 	}
 
 	if(err_code == PPPERR_USER) {
+#if PPPOE_SUPPORT
+		struct netif *pppif = ppp_netif(pcb);
 		printf("Destroying PPPoE and recreating\n");
 		ppp_free(pcb);
-		ppp_over_ethernet_create(pcb, &netif, NULL, NULL, ppp_link_status_cb, NULL);
+		pppoe_create(pppif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
+		ppp_set_auth(pcb, PPPAUTHTYPE_EAP, username, password);
 		ppp_open(pcb, 5);
+#endif
 	}
 
 	if(err_code != PPPERR_NONE) {
@@ -232,14 +238,18 @@ main(int argc, char **argv)
   int ch;
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
   sys_sem_t sem;
-  const char *username = "essai", *password = "aon0viipheehooX";
   const char *username2 = "essai2", *password2 = "aon0viipheehooX";
-  ppp_pcb *ppp = NULL, *ppp2 = NULL;
+#if PPPOE_SUPPORT
+  ppp_pcb *ppp = NULL;
+  struct netif pppnetif;
+#endif
 #if PPPOL2TP_SUPPORT
   ppp_pcb *pppl2tp = NULL;
+  struct netif pppl2tpnetif;
 #endif
 #if PPPOS_SUPPORT
   ppp_pcb *ppps = NULL;
+  struct netif pppsnetif;
   sio_status_t *ser = NULL;
 #endif /* PPPOS_SUPPORT */
   int coin = 0;
@@ -345,37 +355,33 @@ main(int argc, char **argv)
   timer_set_interval(TIMER_EVT_IPREASSTMR, IP_TMR_INTERVAL / 10);
 #endif
 
-	ppp = pppapi_new();
-	ppp2 = pppapi_new();
-#if PPPOS_SUPPORT
-	ppps = pppapi_new();
-#endif
-#if PPPOL2TP_SUPPORT
-	pppl2tp = pppapi_new();
-	pppapi_set_default(pppl2tp);
-#endif
-
-#if PPP_DEBUG
-	fprintf(stderr, "ppp = %d\n", ppp->num);
-	fprintf(stderr, "ppp2 = %d\n", ppp2->num);
-#endif
 	fprintf(stderr, "ppp_pcb sizeof(ppp) = %ld\n", sizeof(ppp_pcb));
 
-	pppapi_set_auth(ppp, PPPAUTHTYPE_EAP, username, password);
 #if PPPOE_SUPPORT
-	pppapi_over_ethernet_create(ppp, &netif, NULL, NULL, ppp_link_status_cb, NULL);
+	memset(&pppnetif, 0, sizeof(struct netif));
+	ppp = pppapi_pppoe_create(&pppnetif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
+	pppapi_set_auth(ppp, PPPAUTHTYPE_EAP, username, password);
+#if PPP_DEBUG
+	fprintf(stderr, "PPPoE ID = %d\n", ppp->num);
+#endif
 	pppapi_open(ppp, 0);
 #endif
 
-	pppapi_set_auth(ppp2, PPPAUTHTYPE_MSCHAP, username2, password2);
-	/* pppapi_over_ethernet_open(ppp2, &netif2, NULL, NULL, ppp_link_status_cb, NULL); */
+	/* pppapi_set_auth(ppp2, PPPAUTHTYPE_MSCHAP, username2, password2);
+	pppapi_pppoe_open(ppp2, &netif2, NULL, NULL, ppp_link_status_cb, NULL); */
 #if PPPOS_SUPPORT
+	memset(&pppsnetif, 0, sizeof(struct netif));
+
 	ser = sio_open(2);
 	fprintf(stderr, "SIO FD = %d\n", ser->fd);
 	sys_msleep(300); /* wait a little bit for forked pppd to be ready */
 
+	ppps = pppapi_pppos_create(&pppsnetif, ser, ppp_link_status_cb, NULL);
 	pppapi_set_auth(ppps, PPPAUTHTYPE_PAP, username2, password2);
-	pppapi_over_serial_create(ppps, ser, ppp_link_status_cb, NULL);
+	pppapi_set_default(ppps);
+#if PPP_DEBUG
+	fprintf(stderr, "PPPoS ID = %d\n", ppps->num);
+#endif
 	ppp_open(ppps, 0);
 #endif
 
@@ -384,17 +390,21 @@ main(int argc, char **argv)
 		ip_addr_t l2tpserv;
 /*		sys_msleep(5000); */
 		fprintf(stderr, "L2TP Started\n");
-		l2tpserv.addr = PP_HTONL(0xC0A80101); /* 192.168.1.1 */
+/*		l2tpserv.addr = PP_HTONL(0xC0A80101);*/ /* 192.168.1.1 */
 		l2tpserv.addr = PP_HTONL(0xC0A804fe); /* 192.168.4.254 */
-		l2tpserv.addr = PP_HTONL(0x0A010A00); /* 10.1.10.0 */
+/* 		l2tpserv.addr = PP_HTONL(0x0A010A00);*/ /* 10.1.10.0 */
+
+		memset(&pppl2tpnetif, 0, sizeof(struct netif));
+		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(ppp), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
 		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_EAP, username2, password2);
-		pppapi_over_l2tp_create(pppl2tp, ppp_netif(ppp), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
+		pppapi_set_default(pppl2tp);
+#if PPP_DEBUG
+		fprintf(stderr, "PPPoL2TP ID = %d\n", pppl2tp->num);
+#endif
 		ppp_open(pppl2tp, 0);
-		/* pppapi_over_l2tp_open(pppl2tp, NULL, &l2tpserv, 1701, NULL, 0, ppp_link_status_cb, NULL); */
+		/* pppapi_pppol2tp_open(pppl2tp, NULL, &l2tpserv, 1701, NULL, 0, ppp_link_status_cb, NULL); */
 	}
 #endif
-
-	pppapi_set_default(ppps);
 
 #if 0
 	/* start pppd */

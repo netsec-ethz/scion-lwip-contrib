@@ -429,7 +429,7 @@
 /**
  * PPPOS_SUPPORT==1: Enable PPP Over Serial
  */
-#define PPPOS_SUPPORT                 	1
+#define PPPOS_SUPPORT                   1
 
 #define PPPOL2TP_SUPPORT                1
 #define PPPOL2TP_AUTH_SUPPORT           1
@@ -510,7 +510,7 @@
 
 #define PPP_INPROC_MULTITHREADED 1
 
-#define PPP_FCS_TABLE 0
+#define PPP_FCS_TABLE 1
 
 #define LWIP_PPP_API 1
 
@@ -518,6 +518,10 @@
 #define LWIP_NETIF_LINK_CALLBACK 1
 
 #define LWIP_NETIF_API 1
+
+#define PPP_NOTIFY_PHASE 1
+
+#define PPP_PROTOCOLNAME  1
 
 #define TCP_MSS 100
 /* #define TCP_WND 8400 */
