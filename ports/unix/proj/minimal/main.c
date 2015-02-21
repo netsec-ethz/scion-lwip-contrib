@@ -362,7 +362,7 @@ main(int argc, char **argv)
 	ppp = pppapi_pppoe_create(&pppnetif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
 	pppapi_set_auth(ppp, PPPAUTHTYPE_EAP, username, password);
 #if PPP_DEBUG
-	fprintf(stderr, "PPPoE ID = %d\n", ppp->num);
+	fprintf(stderr, "PPPoE ID = %d\n", ppp->netif->num);
 #endif
 	pppapi_open(ppp, 0);
 #endif
@@ -380,7 +380,7 @@ main(int argc, char **argv)
 	pppapi_set_auth(ppps, PPPAUTHTYPE_PAP, username2, password2);
 	pppapi_set_default(ppps);
 #if PPP_DEBUG
-	fprintf(stderr, "PPPoS ID = %d\n", ppps->num);
+	fprintf(stderr, "PPPoS ID = %d\n", ppps->netif->num);
 #endif
 	ppp_open(ppps, 0);
 #endif
@@ -399,7 +399,7 @@ main(int argc, char **argv)
 		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_EAP, username2, password2);
 		pppapi_set_default(pppl2tp);
 #if PPP_DEBUG
-		fprintf(stderr, "PPPoL2TP ID = %d\n", pppl2tp->num);
+		fprintf(stderr, "PPPoL2TP ID = %d\n", pppl2tp->netif->num);
 #endif
 		ppp_open(pppl2tp, 0);
 		/* pppapi_pppol2tp_open(pppl2tp, NULL, &l2tpserv, 1701, NULL, 0, ppp_link_status_cb, NULL); */
