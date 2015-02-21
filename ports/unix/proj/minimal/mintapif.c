@@ -329,13 +329,17 @@ mintapif_select(struct netif *netif)
   int ret;
   struct timeval tv;
   struct mintapif *mintapif;
-  u32_t msecs = sys_timeouts_sleeptime(); 
+#if (NO_SYS == 1)
+  u32_t msecs = sys_timeouts_sleeptime();
+  tv.tv_sec = msecs / 1000;
+  tv.tv_usec = (msecs % 1000) * 1000;
+#else /* NO_SYS=1 */
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
+#endif /* NO_SYS=1 */
 
   mintapif = (struct mintapif *)netif->state;
 
-  tv.tv_sec = msecs / 1000;
-  tv.tv_usec = (msecs % 1000) * 1000;
-  
   FD_ZERO(&fdset);
   FD_SET(mintapif->fd, &fdset);
 

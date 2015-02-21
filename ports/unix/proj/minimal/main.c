@@ -80,6 +80,7 @@ int to_pppd[2], from_pppd[2];
 #endif
 
 struct netif netif;
+struct netif netif2;
 const char *username = "essai", *password = "aon0viipheehooX";
 
 /* 'non-volatile' SNMP settings
@@ -227,8 +228,6 @@ void sio_input(ppp_pcb *pcb) {
 }
 #endif
 
-void
-
 #if LWIP_SNMP
 static void
 snmp_increment(void *arg)
@@ -242,8 +241,6 @@ snmp_increment(void *arg)
 int
 main(int argc, char **argv)
 {
-  struct netif netif2;
-  struct netif netif;
   int ch;
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
   sys_sem_t sem;
