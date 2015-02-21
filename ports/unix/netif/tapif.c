@@ -107,12 +107,12 @@ low_level_init(struct netif *netif)
   /* Obtain MAC address from network interface. */
 
   /* (We just fake an address...) */
-  tapif->ethaddr->addr[0] = 0x1;
-  tapif->ethaddr->addr[1] = 0x2;
-  tapif->ethaddr->addr[2] = 0x3;
-  tapif->ethaddr->addr[3] = 0x4;
-  tapif->ethaddr->addr[4] = 0x5;
-  tapif->ethaddr->addr[5] = 0x6;
+  tapif->ethaddr->addr[0] = 0x02;
+  tapif->ethaddr->addr[1] = 0x12;
+  tapif->ethaddr->addr[2] = 0x34;
+  tapif->ethaddr->addr[3] = 0x56;
+  tapif->ethaddr->addr[4] = 0x78;
+  tapif->ethaddr->addr[5] = 0xab;
 
   /* Do whatever else is needed to initialize interface. */
 
@@ -140,10 +140,10 @@ low_level_init(struct netif *netif)
 #endif /* Linux */
 
   sprintf(buf, IFCONFIG_BIN IFCONFIG_ARGS,
-           ip4_addr1(&(netif->ip_addr)),
-           ip4_addr2(&(netif->ip_addr)),
-           ip4_addr3(&(netif->ip_addr)),
-           ip4_addr4(&(netif->ip_addr))
+           ip4_addr1(&(netif->gw)),
+           ip4_addr2(&(netif->gw)),
+           ip4_addr3(&(netif->gw)),
+           ip4_addr4(&(netif->gw))
 #ifdef NETMASK_ARGS
            ,
            ip4_addr1(&(netif->netmask)),

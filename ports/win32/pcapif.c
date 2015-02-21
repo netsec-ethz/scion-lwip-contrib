@@ -82,6 +82,12 @@
 #define PCAPIF_FILTER_GROUP_ADDRESSES 1
 #endif
 
+/** Set this to 1 to receive all frames (also unicast to other addresses;
+    this is only needed for test purposes) */
+#ifndef PCAPIF_RECEIVE_PROMISCUOUS
+#define PCAPIF_RECEIVE_PROMISCUOUS    0
+#endif
+
 /* Define those to better describe your network interface.
    For now, we use 'e0', 'e1', 'e2' and so on */
 #define IFNAME0                       'e'
@@ -99,12 +105,30 @@
 #define PCAPIF_HANDLE_LINKSTATE       1
 #endif
 
+/** This can be used when netif->state is used for something else in your
+ * application (e.g. when wrapping a class around this interface). Just
+ * make sure this define returns the state pointer set by
+ * pcapif_low_level_init() (e.g. by using an offset or a callback).
+ */
+#ifndef PCAPIF_GET_STATE_PTR
+#define PCAPIF_GET_STATE_PTR(netif)   ((netif)->state)
+#endif
+
 #if PCAPIF_HANDLE_LINKSTATE
 #include "pcapif_helper.h"
 
 /* Define "PHY" delay when "link up" */
 #ifndef PCAPIF_LINKUP_DELAY
 #define PCAPIF_LINKUP_DELAY           0
+#endif
+
+/* Define PCAPIF_RX_LOCK_LWIP and PCAPIF_RX_UNLOCK_LWIP if you need to lock the lwIP core
+   before/after pbuf_alloc() or netif->input() are called on RX. */
+#ifndef PCAPIF_RX_LOCK_LWIP
+#define PCAPIF_RX_LOCK_LWIP()
+#endif
+#ifndef PCAPIF_RX_UNLOCK_LWIP
+#define PCAPIF_RX_UNLOCK_LWIP()
 #endif
 
 #define PCAPIF_LINKCHECK_INTERVAL_MS 500
@@ -242,6 +266,46 @@ get_adapter_index(const char* adapter_guid)
 }
 #endif /* defined(PACKET_LIB_GET_ADAPTER_NETADDRESS) || defined(PACKET_LIB_ADAPTER_GUID) */
 
+static pcap_t*
+pcapif_open_adapter(const char* adapter_name, char* errbuf)
+{
+  pcap_t* adapter = pcap_open_live(adapter_name,/* name of the device */
+                               65536,             /* portion of the packet to capture */
+                                                  /* 65536 guarantees that the whole packet will be captured on all the link layers */
+                               PCAP_OPENFLAG_PROMISCUOUS,/* promiscuous mode */
+#if PCAPIF_RX_USE_THREAD
+                               /*-*/1,                /* don't wait at all for lower latency */
+#else
+                               1,                /* wait 1 ms in ethernetif_poll */
+#endif
+                               errbuf);           /* error buffer */
+  return adapter;
+}
+
+static void
+pcap_reopen_adapter(struct pcapif_private *pa)
+{
+  char errbuf[PCAP_ERRBUF_SIZE+1];
+  pcap_if_t *alldevs;
+  if (pa->adapter != NULL) {
+    pcap_close(pa->adapter);
+    pa->adapter = NULL;
+  }
+  if (pcap_findalldevs(&alldevs, errbuf) != -1) {
+    pcap_if_t *d;
+    for (d = alldevs; d != NULL; d = d->next) {
+      if (!strcmp(d->name, pa->name)) {
+        pa->adapter = pcapif_open_adapter(pa->name, errbuf);
+        if (pa->adapter == NULL) {
+          printf("failed to reopen pcap adapter after failure: %s\n", errbuf);
+        }
+        break;
+      }
+    }
+    pcap_freealldevs(alldevs);
+  }
+}
+
 /**
  * Open a network adapter and set it up for packet input
  *
@@ -256,7 +320,7 @@ pcapif_init_adapter(int adapter_num, void *arg)
   int number_of_adapters;
   struct pcapif_private *pa;
   char errbuf[PCAP_ERRBUF_SIZE+1];
-  
+
   pcap_if_t *alldevs;
   pcap_if_t *d;
   pcap_if_t *used_adapter = NULL;
@@ -275,7 +339,7 @@ pcapif_init_adapter(int adapter_num, void *arg)
     free(pa);
     return NULL; /* no adapters found */
   }
-  /* get number of adatpers and adapter pointer */
+  /* get number of adapters and adapter pointer */
   for (d = alldevs, number_of_adapters = 0; d != NULL; d = d->next, number_of_adapters++) {
     if (number_of_adapters == adapter_num) {
       char *desc = d->description;
@@ -375,18 +439,9 @@ pcapif_init_adapter(int adapter_num, void *arg)
   LWIP_ASSERT("used_adapter != NULL", used_adapter != NULL);
 
   /* Open the device */
-  pa->adapter = pcap_open_live(used_adapter->name,/* name of the device */
-                               65536,             /* portion of the packet to capture */
-                                                  /* 65536 guarantees that the whole packet will be captured on all the link layers */
-                               PCAP_OPENFLAG_PROMISCUOUS,/* promiscuous mode */
-#if PCAPIF_RX_USE_THREAD
-                               /*-*/1,                /* don't wait at all for lower latency */
-#else
-                               1,                /* wait 1 ms in ethernetif_poll */
-#endif
-                               errbuf);           /* error buffer */
+  pa->adapter = pcapif_open_adapter(used_adapter->name, errbuf);
   if (pa->adapter == NULL) {
-    printf("\nUnable to open the adapter. %s is not supported by WinPcap\n", used_adapter->name);
+    printf("\nUnable to open the adapter. %s is not supported by WinPcap (\"%s\").\n", d->name, errbuf);
     /* Free the device list */
     pcap_freealldevs(alldevs);
     free(pa);
@@ -408,7 +463,7 @@ void
 pcapif_check_linkstate(void *netif_ptr)
 {
   struct netif *netif = (struct netif*)netif_ptr;
-  struct pcapif_private *pa = (struct pcapif_private*)netif->state;
+  struct pcapif_private *pa = (struct pcapif_private*)PCAPIF_GET_STATE_PTR(netif);
   enum pcapifh_link_event le;
 
   le = pcapifh_linkstate_get(pa->link_state);
@@ -439,7 +494,7 @@ pcapif_check_linkstate(void *netif_ptr)
 void
 pcapif_shutdown(struct netif *netif)
 {
-  struct pcapif_private *pa = (struct pcapif_private*)netif->state;
+  struct pcapif_private *pa = (struct pcapif_private*)PCAPIF_GET_STATE_PTR(netif);
   if (pa) {
 #if PCAPIF_RX_USE_THREAD
     pa->rx_run = 0;
@@ -465,7 +520,7 @@ static void
 pcapif_input_thread(void *arg)
 {
   struct netif *netif = (struct netif *)arg;
-  struct pcapif_private *pa = (struct pcapif_private*)netif->state;
+  struct pcapif_private *pa = (struct pcapif_private*)PCAPIF_GET_STATE_PTR(netif);
   do
   {
     struct pcap_pkthdr pkt_header;
@@ -580,7 +635,7 @@ pcapif_low_level_output(struct netif *netif, struct pbuf *p)
   unsigned char *ptr;
   struct eth_hdr *ethhdr;
   u16_t tot_len = p->tot_len - ETH_PAD_SIZE;
-  struct pcapif_private *pa = (struct pcapif_private*)netif->state;
+  struct pcapif_private *pa = (struct pcapif_private*)PCAPIF_GET_STATE_PTR(netif);
 
 #if defined(LWIP_DEBUG) && LWIP_NETIF_TX_SINGLE_PBUF
   LWIP_ASSERT("p->next == NULL && p->len == p->tot_len", p->next == NULL && p->len == p->tot_len);
@@ -654,11 +709,11 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
   struct eth_addr *dest = (struct eth_addr*)packet;
   struct eth_addr *src = dest + 1;
   int unicast;
-#if PCAPIF_FILTER_GROUP_ADDRESSES
+#if PCAPIF_FILTER_GROUP_ADDRESSES && !PCAPIF_RECEIVE_PROMISCUOUS
   const u8_t bcast[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
   const u8_t ipv4mcast[] = {0x01, 0x00, 0x5e};
   const u8_t ipv6mcast[] = {0x33, 0x33};
-#endif /* PCAPIF_FILTER_GROUP_ADDRESSES */
+#endif /* PCAPIF_FILTER_GROUP_ADDRESSES && !PCAPIF_RECEIVE_PROMISCUOUS */
 
   /* Don't let feedback packets through (limitation in winpcap?) */
   if(!memcmp(src, netif->hwaddr, ETHARP_HWADDR_LEN)) {
@@ -666,8 +721,9 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
     return NULL;
   }
 
-  /* MAC filter: only let my MAC or non-unicast through (pcap receives loopback traffic, too) */
   unicast = ((dest->addr[0] & 0x01) == 0);
+#if !PCAPIF_RECEIVE_PROMISCUOUS
+  /* MAC filter: only let my MAC or non-unicast through (pcap receives loopback traffic, too) */
   if (memcmp(dest, &netif->hwaddr, ETHARP_HWADDR_LEN) &&
 #if PCAPIF_FILTER_GROUP_ADDRESSES
     (memcmp(dest, ipv4mcast, 3) || ((dest->addr[3] & 0x80) != 0)) && 
@@ -680,6 +736,7 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
     /* don't update counters here! */
     return NULL;
   }
+#endif /* !PCAPIF_RECEIVE_PROMISCUOUS */
 
   /* We allocate a pbuf chain of pbufs from the pool. */
   p = pbuf_alloc(PBUF_RAW, (u16_t)length + ETH_PAD_SIZE, PBUF_POOL);
@@ -688,7 +745,7 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
   if (p != NULL) {
     /* We iterate over the pbuf chain until we have read the entire
        packet into the pbuf. */
-    start=0;
+    start = 0;
     for (q = p; q != NULL; q = q->next) {
       u16_t copy_len = q->len;
       /* Read enough bytes to fill this pbuf in the chain. The
@@ -719,7 +776,7 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
       snmp_inc_ifinnucastpkts(netif);
     }
   } else {
-    /* drop packet(); */
+    /* drop packet */
     LINK_STATS_INC(link.memerr);
     LINK_STATS_INC(link.drop);
   }
@@ -739,6 +796,8 @@ pcapif_input(u_char *user, const struct pcap_pkthdr *pkt_header, const u_char *p
   struct netif *netif = (struct netif *)pa->input_fn_arg;
   struct pbuf *p;
 
+  PCAPIF_RX_LOCK_LWIP();
+
   /* move received packet into a new pbuf */
   p = pcapif_low_level_input(netif, packet, packet_len);
   /* no packet could be read, silently ignore this */
@@ -749,6 +808,7 @@ pcapif_input(u_char *user, const struct pcap_pkthdr *pkt_header, const u_char *p
       pbuf_free(p);
     }
   }
+  PCAPIF_RX_UNLOCK_LWIP();
 }
 
 /**
@@ -800,13 +860,20 @@ pcapif_init(struct netif *netif)
 void
 pcapif_poll(struct netif *netif)
 {
-  struct pcapif_private *pa = (struct pcapif_private*)netif->state;
+  struct pcapif_private *pa = (struct pcapif_private*)PCAPIF_GET_STATE_PTR(netif);
 
   int ret;
-  do
-  {
-    ret = pcap_dispatch(pa->adapter, -1, pcapif_input, (u_char*)pa);
-  } while(ret > 0);
+  do {
+    if (pa->adapter != NULL) {
+      ret = pcap_dispatch(pa->adapter, -1, pcapif_input, (u_char*)pa);
+    } else {
+      ret = -1;
+    }
+    if (ret < 0) {
+      /* error (e.g. adapter removed or resume from standby), try to reopen the adapter */
+      pcap_reopen_adapter(pa);
+    }
+  } while (ret > 0);
 
 }
 #endif /* !PCAPIF_RX_USE_THREAD */

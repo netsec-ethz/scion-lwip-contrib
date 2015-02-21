@@ -63,6 +63,7 @@
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
 #include "lwip/mem.h"
+#include "lwip/timers.h"
 #include "netif/etharp.h"
 
 #include "mintapif.h"
@@ -84,11 +85,11 @@ low_level_init(struct netif *netif)
   mintapif = (struct mintapif *)netif->state;
   
   /* Obtain MAC address from network interface. */
-  mintapif->ethaddr->addr[0] = 0xf0;
-  mintapif->ethaddr->addr[1] = 0xde;
-  mintapif->ethaddr->addr[2] = 0xf1;
-  mintapif->ethaddr->addr[3] = 0x3c;
-  mintapif->ethaddr->addr[4] = 0x34;
+  mintapif->ethaddr->addr[0] = 0x02;
+  mintapif->ethaddr->addr[1] = 0x12;
+  mintapif->ethaddr->addr[2] = 0x34;
+  mintapif->ethaddr->addr[3] = 0x56;
+  mintapif->ethaddr->addr[4] = 0x78;
   mintapif->ethaddr->addr[5] = 0x00 + netif->num;
 
   /* device capabilities */
@@ -320,45 +321,6 @@ mintapif_init(struct netif *netif)
   return ERR_OK;
 }
 /*-----------------------------------------------------------------------------------*/
-enum mintapif_signal
-mintapif_wait(struct netif *netif, u16_t time)
-{
-  fd_set fdset;
-  struct timeval tv, now;
-  struct timezone tz;
-  int ret;
-  struct mintapif *mintapif;
-
-  mintapif = (struct mintapif *)netif->state;
-
-  while (1) {
-  
-    if (mintapif->lasttime >= (u32_t)time * 1000) {
-      mintapif->lasttime = 0;
-      return MINTAPIF_TIMEOUT;
-    }
-    
-    tv.tv_sec = 0;
-    tv.tv_usec = (u32_t)time * 1000 - mintapif->lasttime;
-    
-    
-    FD_ZERO(&fdset);
-    FD_SET(mintapif->fd, &fdset);
-    
-    gettimeofday(&now, &tz);
-    ret = select(mintapif->fd + 1, &fdset, NULL, NULL, &tv);
-    if (ret == 0) {
-      mintapif->lasttime = 0;    
-      return MINTAPIF_TIMEOUT;
-    } 
-    gettimeofday(&tv, &tz);
-    mintapif->lasttime += (tv.tv_sec - now.tv_sec) * 1000000 + (tv.tv_usec - now.tv_usec);
-
-    mintapif_input(netif);
-  }
-  
-  return MINTAPIF_PACKET;
-}
 
 int
 mintapif_select(struct netif *netif)
@@ -367,11 +329,12 @@ mintapif_select(struct netif *netif)
   int ret;
   struct timeval tv;
   struct mintapif *mintapif;
+  u32_t msecs = sys_timeouts_sleeptime(); 
 
   mintapif = (struct mintapif *)netif->state;
 
-  tv.tv_sec = 0;
-  tv.tv_usec = 0; /* usec_to; */
+  tv.tv_sec = msecs / 1000;
+  tv.tv_usec = (msecs % 1000) * 1000;
   
   FD_ZERO(&fdset);
   FD_SET(mintapif->fd, &fdset);

@@ -43,6 +43,7 @@
 #include "lwip/mem.h"
 #include "lwip/memp.h"
 #include "lwip/sys.h"
+#include "lwip/timers.h"
 
 #include "lwip/stats.h"
 
@@ -58,9 +59,6 @@
 #include "netif/ppp/pppos.h"
 #include "netif/ppp/pppoe.h"
 #include "netif/ppp/pppol2tp.h"
-
-#include "timer.h"
-#include <signal.h>
 
 #include "echo.h"
 #include "private_mib.h"
@@ -111,7 +109,8 @@ static struct option longopts[] = {
 };
 #define NUM_OPTS ((sizeof(longopts) / sizeof(struct option)) - 1)
 
-static void usage(void)
+static void
+usage(void)
 {
   unsigned char i;
    
@@ -228,13 +227,18 @@ void sio_input(ppp_pcb *pcb) {
 }
 #endif
 
+void
+snmp_increment(void *arg)
+{
+  snmp_inc_sysuptime();
+  sys_timeout(10, snmp_increment, NULL);
+} 
+
 int
 main(int argc, char **argv)
 {
   struct netif netif2;
-#if (NO_SYS == 1)
-  sigset_t mask, oldmask, empty;
-#endif
+  struct netif netif;
   int ch;
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
   sys_sem_t sem;
@@ -349,12 +353,9 @@ main(int argc, char **argv)
   echo_init();
 
   timer_init();
-  timer_set_interval(TIMER_EVT_ETHARPTMR, ARP_TMR_INTERVAL / 10);
-  timer_set_interval(TIMER_EVT_TCPTMR, TCP_TMR_INTERVAL / 10);
-#if IP_REASSEMBLY
-  timer_set_interval(TIMER_EVT_IPREASSTMR, IP_TMR_INTERVAL / 10);
-#endif
 
+  printf("Applications started.\n");
+    
 	fprintf(stderr, "ppp_pcb sizeof(ppp) = %ld\n", sizeof(ppp_pcb));
 
 #if PPPOE_SUPPORT
@@ -502,46 +503,10 @@ main(int argc, char **argv)
 
 #if (NO_SYS == 1)
   while (1) {
-    
-      /* poll for input packet and ensure
-         select() or read() arn't interrupted */
-      sigemptyset(&mask);
-      sigaddset(&mask, SIGALRM);
-      sigprocmask(SIG_BLOCK, &mask, &oldmask);
+    /* poll netif, pass packet to lwIP */
+    mintapif_select(&netif);
 
-      /* start of critical section,
-         poll netif, pass packet to lwIP */
-      if (mintapif_select(&netif) > 0)
-      {
-        /* work, immediatly end critical section 
-           hoping lwIP ended quickly ... */
-        sigprocmask(SIG_SETMASK, &oldmask, NULL);
-      }
-      else
-      {
-        /* no work, wait a little (10 msec) for SIGALRM */
-          sigemptyset(&empty);
-          sigsuspend(&empty);
-        /* ... end critical section */
-          sigprocmask(SIG_SETMASK, &oldmask, NULL);
-      }
-
-#if (NO_SYS == 1)
-      if(timer_testclr_evt(TIMER_EVT_TCPTMR))
-      {
-        tcp_tmr();
-      }
-#if IP_REASSEMBLY
-      if(timer_testclr_evt(TIMER_EVT_IPREASSTMR))
-      {
-        ip_reass_tmr();
-      }
-#endif
-      if(timer_testclr_evt(TIMER_EVT_ETHARPTMR))
-      {
-        etharp_tmr();
-      }
-#endif
+    sys_check_timeouts();
   }
 #endif
 
