@@ -505,6 +505,7 @@
 
 #define PRINTPKT_SUPPORT		1
 
+#define PPP_IPV4_SUPPORT 1
 #define PPP_IPV6_SUPPORT 1
 
 #define PPP_SERVER 1

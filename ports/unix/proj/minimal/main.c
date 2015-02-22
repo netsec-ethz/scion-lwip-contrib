@@ -126,6 +126,19 @@ static void tcpip_init_done(void *arg)
 {
   sys_sem_t sem = (sys_sem_t)arg;
 
+#if SNMP_PRIVATE_MIB != 0
+  /* initialize our private example MIB */
+  lwip_privmib_init();
+#endif
+  snmp_trap_dst_ip_set(0,&trap_addr);
+  snmp_trap_dst_enable(0,trap_flag);
+  snmp_set_syscontact(syscontact_str,&syscontact_len);
+  snmp_set_syslocation(syslocation_str,&syslocation_len);
+  snmp_set_snmpenableauthentraps(&snmpauthentraps_set);
+  snmp_init();
+
+  echo_init();
+
   sys_sem_signal(&sem); /* Signal the waiting thread that the TCP/IP init is done. */
 }
 
@@ -135,12 +148,14 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 	switch(err_code) {
 		case PPPERR_NONE: {             /* No error. */
 			struct ppp_addrs *ppp_addrs = ppp_addrs(pcb);
+#if PPP_IPV4_SUPPORT
 			fprintf(stderr, "ppp_link_status_cb: PPPERR_NONE\n\r");
 			fprintf(stderr, "   our_ipaddr  = %s\n\r", ip_ntoa(&ppp_addrs->our_ipaddr));
 			fprintf(stderr, "   his_ipaddr  = %s\n\r", ip_ntoa(&ppp_addrs->his_ipaddr));
 			fprintf(stderr, "   netmask     = %s\n\r", ip_ntoa(&ppp_addrs->netmask));
 			fprintf(stderr, "   dns1        = %s\n\r", ip_ntoa(&ppp_addrs->dns1));
 			fprintf(stderr, "   dns2        = %s\n\r", ip_ntoa(&ppp_addrs->dns2));
+#endif /* PPP_IPV4_SUPPORT */
 #if PPP_IPV6_SUPPORT
 			fprintf(stderr, "   our6_ipaddr = %s\n\r", ip6addr_ntoa(&ppp_addrs->our6_ipaddr));
 			fprintf(stderr, "   his6_ipaddr = %s\n\r", ip6addr_ntoa(&ppp_addrs->his6_ipaddr));
@@ -341,19 +356,6 @@ main(int argc, char **argv)
   fprintf(stderr, "netif %d\n", netif.num);
   fprintf(stderr, "netif2 %d\n", netif2.num);
 
-#if SNMP_PRIVATE_MIB != 0
-  /* initialize our private example MIB */
-  lwip_privmib_init();
-#endif
-  snmp_trap_dst_ip_set(0,&trap_addr);
-  snmp_trap_dst_enable(0,trap_flag);
-  snmp_set_syscontact(syscontact_str,&syscontact_len);
-  snmp_set_syslocation(syslocation_str,&syslocation_len);
-  snmp_set_snmpenableauthentraps(&snmpauthentraps_set);
-  snmp_init();
-
-  echo_init();
-
 #if LWIP_SNMP
   sys_timeout(10, snmp_increment, NULL);
 #endif /* LWIP_SNMP */
@@ -480,7 +482,7 @@ main(int argc, char **argv)
         int len;
         len = sio_read(ser, buffer, 128);
 	if(len < 0) {
-	  pppapi_sighup(ppps);
+	  pppapi_close(ppps, 1);
 	  ser = NULL;
 	} else {
           pppos_input(ppps, buffer, len);
@@ -493,14 +495,14 @@ main(int argc, char **argv)
         if(!(coin%1000)) fprintf(stderr, "COIN %d\n", coin);
 	if(coin == 2000) {
 #if PPPOE_SUPPORT
-		pppapi_close(ppp);
+		pppapi_close(ppp, 0);
 #endif
-		/* pppapi_close(ppps); */
-		/* printf("pppapi_close(ppp) = %d\n", pppapi_close(ppp)); */
+		/* pppapi_close(ppps, 0); */
+		/* printf("pppapi_close(ppp, 0) = %d\n", pppapi_close(ppp, 0)); */
 	}
 #if 0
 	if( !(coin % 2000)) {
-		pppapi_close(ppp);
+		pppapi_close(ppp, 0);
 	}
 #endif
   }
