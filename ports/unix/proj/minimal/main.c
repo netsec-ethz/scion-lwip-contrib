@@ -82,6 +82,16 @@ int to_pppd[2], from_pppd[2];
 struct netif netif;
 struct netif netif2;
 const char *username = "essai", *password = "aon0viipheehooX";
+#if PPPOE_SUPPORT
+  ppp_pcb *pppoe;
+#endif
+#if PPPOL2TP_SUPPORT
+  ppp_pcb *pppl2tp;
+#endif
+#if PPPOS_SUPPORT
+  ppp_pcb *pppos;
+  sio_status_t *ser;
+#endif /* PPPOS_SUPPORT */
 
 /* 'non-volatile' SNMP settings
   @todo: make these truly non-volatile */
@@ -249,8 +259,8 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 		}
 	}
 
-	if(err_code == PPPERR_USER) {
 #if PPPOE_SUPPORT
+	if(err_code == PPPERR_USER && pcb == pppoe) {
 		struct netif *pppif = ppp_netif(pcb);
 		printf("Destroying PPPoE and recreating\n");
 		ppp_free(pcb);
@@ -258,10 +268,14 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 		ppp_set_notify_phase_callback(pcb, ppp_notify_phase_cb);
 		ppp_set_auth(pcb, PPPAUTHTYPE_EAP, username, password);
 		ppp_open(pcb, 5);
-#endif
 	}
+#endif
 
-	if(err_code != PPPERR_NONE) {
+	if (err_code != PPPERR_NONE) {
+		if (pcb == pppos) {
+			ser = sio_open(2);
+			printf("SIO FD = %d\n", ser->fd);
+		}
 		ppp_open(pcb, 5);
 /*		printf("ppp_free(pcb) = %d\n", ppp_free(pcb)); */
 /*		printf("ppp_delete(pcb) = %d\n", ppp_delete(pcb)); */
@@ -311,17 +325,13 @@ main(int argc, char **argv)
   sys_sem_t sem;
   const char *username2 = "essai2", *password2 = "aon0viipheehooX";
 #if PPPOE_SUPPORT
-  ppp_pcb *ppp = NULL;
   struct netif pppnetif;
 #endif
 #if PPPOL2TP_SUPPORT
-  ppp_pcb *pppl2tp = NULL;
   struct netif pppl2tpnetif;
 #endif
 #if PPPOS_SUPPORT
-  ppp_pcb *ppps = NULL;
   struct netif pppsnetif;
-  sio_status_t *ser = NULL;
 #endif /* PPPOS_SUPPORT */
   int coin = 0;
 
@@ -417,13 +427,13 @@ main(int argc, char **argv)
 
 #if PPPOE_SUPPORT
 	memset(&pppnetif, 0, sizeof(struct netif));
-	ppp = pppapi_pppoe_create(&pppnetif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
-	ppp_set_notify_phase_callback(ppp, ppp_notify_phase_cb);
-	pppapi_set_auth(ppp, PPPAUTHTYPE_EAP, username, password);
+	pppoe = pppapi_pppoe_create(&pppnetif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
+	ppp_set_notify_phase_callback(pppoe, ppp_notify_phase_cb);
+	pppapi_set_auth(pppoe, PPPAUTHTYPE_EAP, username, password);
 #if PPP_DEBUG
-	printf("PPPoE ID = %d\n", ppp->netif->num);
+	printf("PPPoE ID = %d\n", pppoe->netif->num);
 #endif
-	pppapi_open(ppp, 0);
+	pppapi_open(pppoe, 0);
 #endif
 
 	/* pppapi_set_auth(ppp2, PPPAUTHTYPE_MSCHAP, username2, password2);
@@ -433,17 +443,16 @@ main(int argc, char **argv)
 
 	ser = sio_open(2);
 	printf("SIO FD = %d\n", ser->fd);
-	sys_msleep(300); /* wait a little bit for forked pppd to be ready */
 
-	ppps = pppapi_pppos_create(&pppsnetif, ser, ppp_link_status_cb, NULL);
-	ppp_set_notify_phase_callback(ppps, ppp_notify_phase_cb);
+	pppos = pppapi_pppos_create(&pppsnetif, ser, ppp_link_status_cb, NULL);
+	ppp_set_notify_phase_callback(pppos, ppp_notify_phase_cb);
 
-	pppapi_set_auth(ppps, PPPAUTHTYPE_PAP, username2, password2);
-	pppapi_set_default(ppps);
+	pppapi_set_auth(pppos, PPPAUTHTYPE_PAP, username2, password2);
+	pppapi_set_default(pppos);
 #if PPP_DEBUG
-	printf("PPPoS ID = %d\n", ppps->netif->num);
+	printf("PPPoS ID = %d\n", pppos->netif->num);
 #endif
-	ppp_open(ppps, 0);
+	ppp_open(pppos, 0);
 #endif
 
 #if PPPOL2TP_SUPPORT
@@ -456,7 +465,7 @@ main(int argc, char **argv)
 /* 		l2tpserv.addr = PP_HTONL(0x0A010A00);*/ /* 10.1.10.0 */
 
 		memset(&pppl2tpnetif, 0, sizeof(struct netif));
-		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(ppp), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
+		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
 		ppp_set_notify_phase_callback(pppl2tp, ppp_notify_phase_cb);
 		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_EAP, username2, password2);
 		pppapi_set_default(pppl2tp);
@@ -531,15 +540,17 @@ main(int argc, char **argv)
         sio_input(ppps);
 #endif
 #if PPPOS_SUPPORT
-      if(ppps && ser && FD_ISSET(ser->fd, &fdset) ) {
+      if(pppos && ser && FD_ISSET(ser->fd, &fdset) ) {
         u8_t buffer[128];
         int len;
         len = sio_read(ser, buffer, 128);
 	if(len < 0) {
-	  pppapi_close(ppps, 1);
+	  close(ser->fd);
+	  ser->fd = -1;
 	  ser = NULL;
+	  pppapi_close(pppos, 1);
 	} else {
-          pppos_input(ppps, buffer, len);
+          pppos_input(pppos, buffer, len);
 	}
       }
 #endif /* PPP_INPROC_MULTITHREADED */
@@ -549,7 +560,7 @@ main(int argc, char **argv)
         if(!(coin%1000)) printf("COIN %d\n", coin);
 	if(coin == 2000) {
 #if PPPOE_SUPPORT
-		pppapi_close(ppp, 0);
+		pppapi_close(pppoe, 0);
 #endif
 		/* pppapi_close(ppps, 0); */
 		/* printf("pppapi_close(ppp, 0) = %d\n", pppapi_close(ppp, 0)); */

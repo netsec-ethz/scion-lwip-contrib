@@ -318,13 +318,18 @@ sio_status_t * sio_unix_open( int devnum )
 #if PPP_SUPPORT
 	else if (devnum == 2) {
 	    pid_t childpid;
-	    childpid = forkpty(&siostate->fd, NULL, NULL, NULL);
+	    struct termios tios;
+	    tcgetattr(siostate->fd, &tios);  /* Disable buffered I/O and echo mode for emulated terminal */
+	    tios.c_lflag &= ~(ICANON|ECHO);
+	    tcsetattr(siostate->fd, TCSANOW, &tios);
+
+	    childpid = forkpty(&siostate->fd, NULL, &tios, NULL);
 	    if(childpid < 0) {
 		perror("forkpty");
 		exit (1);
 	    }
 	    if(childpid == 0) {
-		execl("/usr/sbin/pppd", "pppd",
+		execl("/usr/sbin/pppd", "pppd", "silent",
 			"ms-dns", "198.168.100.7",
 			"local", "crtscts",
 			"debug", "asyncmap", "12345678",
