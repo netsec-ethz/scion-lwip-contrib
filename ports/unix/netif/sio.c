@@ -58,7 +58,7 @@
 /*  } siostruct_t; */
 
 /** array of ((siostruct*)netif->state)->sio structs */
-static sio_status_t statusar[3];
+static sio_status_t statusar[4];
 
 #if ! PPP_SUPPORT
 /* --private-functions----------------------------------------------------------------- */
@@ -316,7 +316,7 @@ sio_status_t * sio_unix_open( int devnum )
 		}
 	} 
 #if PPP_SUPPORT
-	else if (devnum == 2) {
+	else if (devnum == 2 || devnum == 3) {
 	    pid_t childpid;
 	    struct termios tios;
 	    tcgetattr(siostate->fd, &tios);  /* Disable buffered I/O and echo mode for emulated terminal */
@@ -329,22 +329,39 @@ sio_status_t * sio_unix_open( int devnum )
 		exit (1);
 	    }
 	    if(childpid == 0) {
-		execl("/usr/sbin/pppd", "pppd", "silent",
-			"ms-dns", "198.168.100.7",
-			"local", "crtscts",
-			"debug", "asyncmap", "12345678",
+		/* PPP server */
+		if (devnum == 2) {
+			execl("/usr/sbin/pppd", "pppd", "silent",
+				"ms-dns", "198.168.100.7",
+				"local", "crtscts",
+				"debug", "asyncmap", "12345678",
 #if PPP_IPV6_SUPPORT
-			"+ipv6",
+				"+ipv6",
 #endif
 #ifdef LWIP_PPP_CHAP_TEST
-			"auth",
-			"require-chap",
-			"remotename", "lwip",
+				"auth",
+				"require-chap",
+				"remotename", "lwip",
 #else
-			"noauth",
+				"noauth",
 #endif
-			"192.168.2.1:192.168.2.2",
-			NULL);
+				"show-password",
+				"192.168.2.1:192.168.2.2",
+				NULL);
+		}
+		/* PPP client */
+		else if (devnum == 3) {
+			execl("/usr/sbin/pppd", "pppd",
+				"local", "crtscts",
+				"debug", "asyncmap", "12345678",
+#if PPP_IPV6_SUPPORT
+				"+ipv6",
+#endif
+				"noauth",
+				"noipdefault", "show-password",
+				"user", "essai10",
+				NULL);
+		}
 		perror("execl pppd");
 		exit (1);
 	    } else {

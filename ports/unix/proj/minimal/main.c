@@ -267,19 +267,23 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 		pcb = pppoe_create(pppif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
 		ppp_set_notify_phase_callback(pcb, ppp_notify_phase_cb);
 		ppp_set_auth(pcb, PPPAUTHTYPE_EAP, username, password);
-		ppp_open(pcb, 5);
+		ppp_connect(pcb, 5);
 	}
 #endif
 
 	if (err_code != PPPERR_NONE) {
 		if (pcb == pppos) {
+#if PPP_SERVER
+			ser = sio_open(3);
+#else
 			ser = sio_open(2);
+#endif /* PPP_SERVER */
 			printf("SIO FD = %d\n", ser->fd);
 		}
-		ppp_open(pcb, 5);
+		ppp_connect(pcb, 5);
 /*		printf("ppp_free(pcb) = %d\n", ppp_free(pcb)); */
 /*		printf("ppp_delete(pcb) = %d\n", ppp_delete(pcb)); */
-		/* printf("ppp_open(pcb, 5) = %d\n", ppp_open(pcb, 5)); */
+		/* printf("ppp_connect(pcb, 5) = %d\n", ppp_connect(pcb, 5)); */
 	}
 
 /*	if(errCode != PPPERR_NONE) {
@@ -323,7 +327,8 @@ main(int argc, char **argv)
   int ch;
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
   sys_sem_t sem;
-  const char *username2 = "essai2", *password2 = "aon0viipheehooX";
+  /* const char *username2 = "essai2", *password2 = "aon0viipheehooX"; */
+  const char *username2 = "essai10", *password2 = "essai10pass";
 #if PPPOE_SUPPORT
   struct netif pppnetif;
 #endif
@@ -433,7 +438,7 @@ main(int argc, char **argv)
 #if PPP_DEBUG
 	printf("PPPoE ID = %d\n", pppoe->netif->num);
 #endif
-	pppapi_open(pppoe, 0);
+	pppapi_connect(pppoe, 0);
 #endif
 
 	/* pppapi_set_auth(ppp2, PPPAUTHTYPE_MSCHAP, username2, password2);
@@ -441,19 +446,37 @@ main(int argc, char **argv)
 #if PPPOS_SUPPORT
 	memset(&pppsnetif, 0, sizeof(struct netif));
 
+#if PPP_SERVER
+	ser = sio_open(3);
+#else
 	ser = sio_open(2);
+#endif /* PPP_SERVER */
 	printf("SIO FD = %d\n", ser->fd);
 
 	pppos = pppapi_pppos_create(&pppsnetif, ser, ppp_link_status_cb, NULL);
 	ppp_set_notify_phase_callback(pppos, ppp_notify_phase_cb);
 
-	pppapi_set_auth(pppos, PPPAUTHTYPE_PAP, username2, password2);
+	pppapi_set_auth(pppos, PPPAUTHTYPE_MSCHAP, username2, password2);
 	pppapi_set_default(pppos);
 #if PPP_DEBUG
 	printf("PPPoS ID = %d\n", pppos->netif->num);
 #endif
-	ppp_open(pppos, 0);
-#endif
+#if PPP_SERVER
+	{
+		struct ppp_addrs serveraddrs;
+#if PPP_IPV4_SUPPORT
+		IP4_ADDR(&serveraddrs.our_ipaddr,  192,168,70,1);
+		IP4_ADDR(&serveraddrs.his_ipaddr,  192,168,70,2);
+		IP4_ADDR(&serveraddrs.netmask,     255,255,255,255);
+		IP4_ADDR(&serveraddrs.dns1,        192,168,70,20);
+		IP4_ADDR(&serveraddrs.dns2,        192,168,70,21);
+#endif /* PPP_IPV4_SUPPORT */
+		pppapi_listen(pppos, &serveraddrs);
+	}
+#else /* PPP_SERVER */
+	pppapi_connect(pppos, 0);
+#endif /* PPP_SERVER */
+#endif /* PPPOS_SUPPORT */
 
 #if PPPOL2TP_SUPPORT
 	{
@@ -472,7 +495,7 @@ main(int argc, char **argv)
 #if PPP_DEBUG
 		printf("PPPoL2TP ID = %d\n", pppl2tp->netif->num);
 #endif
-		ppp_open(pppl2tp, 0);
+		ppp_connect(pppl2tp, 0);
 		/* pppapi_pppol2tp_open(pppl2tp, NULL, &l2tpserv, 1701, NULL, 0, ppp_link_status_cb, NULL); */
 	}
 #endif
