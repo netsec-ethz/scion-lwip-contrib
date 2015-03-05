@@ -207,6 +207,7 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 	switch(err_code) {
 		case PPPERR_NONE: {             /* No error. */
 			struct ppp_addrs *ppp_addrs = ppp_addrs(pcb);
+			struct netif *netif = ppp_netif(pcb);
 #if PPP_IPV4_SUPPORT
 			printf("ppp_link_status_cb[%d]: PPPERR_NONE\n", pcb->netif->num);
 			printf("   our_ipaddr  = %s\n", ip_ntoa(&ppp_addrs->our_ipaddr));
@@ -218,6 +219,14 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #if PPP_IPV6_SUPPORT
 			printf("   our6_ipaddr = %s\n", ip6addr_ntoa(&ppp_addrs->our6_ipaddr));
 			printf("   his6_ipaddr = %s\n", ip6addr_ntoa(&ppp_addrs->his6_ipaddr));
+			if (err_code == PPPERR_NONE && pcb == pppoe) {
+				netif->ip6_addr[1].addr[0] = PP_HTONL(0x20010000);
+				netif->ip6_addr[1].addr[1] = PP_HTONL(0x00000000);
+				netif->ip6_addr[1].addr[2] = PP_HTONL(0x00000000);
+				netif->ip6_addr[1].addr[3] = PP_HTONL(0x00010002);
+				/* netif_ip6_addr_set_state(netif, 1, IP6_ADDR_PREFERRED); */
+				netif_ip6_addr_set_state(netif, 1, IP6_ADDR_PREFERRED);
+			}
 #endif /* PPP_IPV6_SUPPORT */
 			break;
 		}
@@ -253,6 +262,22 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 			printf("ppp_link_status_cb[%d]: PPPERR_PROTOCOL\n", pcb->netif->num);
 			break;
 		}
+		case PPPERR_PEERDEAD: {        /* Connection timeout. */
+			printf("ppp_link_status_cb[%d]: PPPERR_PEERDEAD\n", pcb->netif->num);
+			break;
+		}
+		case PPPERR_IDLETIMEOUT: {      /* Idle Timeout. */
+			printf("ppp_link_status_cb[%d]: PPPERR_IDLETIMEOUT\n", pcb->netif->num);
+			break;
+		}
+		case PPPERR_CONNECTTIME: {      /* Max connect time reache. */
+			printf("ppp_link_status_cb[%d]: PPPERR_CONNECTTIME\n", pcb->netif->num);
+			break;
+		}
+		case PPPERR_LOOPBACK: {        /* Loopback detected. */
+			printf("ppp_link_status_cb[%d]: PPPERR_LOOPBACK\n", pcb->netif->num);
+			break;
+		}
 		default: {
 			printf("ppp_link_status_cb[%d]: unknown err code %d\n", pcb->netif->num, err_code);
 			break;
@@ -272,14 +297,17 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #endif
 
 	if (err_code != PPPERR_NONE) {
+#if PPPOS_SUPPORT
 		if (pcb == pppos) {
 #if PPP_SERVER
 			ser = sio_open(3);
-#else
+#else /* PPP_SERVER */
 			ser = sio_open(2);
 #endif /* PPP_SERVER */
 			printf("SIO FD = %d\n", ser->fd);
 		}
+#endif /* PPPOS_SUPPORT */
+
 		ppp_connect(pcb, 5);
 /*		printf("ppp_free(pcb) = %d\n", ppp_free(pcb)); */
 /*		printf("ppp_delete(pcb) = %d\n", ppp_delete(pcb)); */
@@ -406,6 +434,23 @@ main(int argc, char **argv)
 
   netifapi_netif_add(&netif, &ipaddr, &netmask, &gw, NULL, mintapif_init, tcpip_input);
   /* netifapi_set_default(&netif); */
+
+  {
+#if LWIP_IPV6
+	ip6_addr_t multicast_address;
+	netif.ip6_addr[1].addr[0] = PP_HTONL(0x20010000);
+	netif.ip6_addr[1].addr[1] = PP_HTONL(0x00000000);
+	netif.ip6_addr[1].addr[2] = PP_HTONL(0x00000000);
+	netif.ip6_addr[1].addr[3] = PP_HTONL(0x00000002);
+	netif_ip6_addr_set_state(&netif, 1, IP6_ADDR_PREFERRED);
+	ip6_addr_set_solicitednode(&multicast_address, netif_ip6_addr(&netif, 1)->addr[3]);
+	mld6_joingroup(netif_ip6_addr(&netif, 1), &multicast_address);
+/*	netif_ip6_addr_set_state(&netif, 1, IP6_ADDR_TENTATIVE); */
+	/* netif_ip6_addr_set_state(&netif, 1, IP6_ADDR_TENTATIVE|IP6_ADDR_PREFERRED); */
+	netif_create_ip6_linklocal_address(&netif, 1);
+#endif /* LWIP_IPV6 */
+  }
+
   netifapi_netif_set_up(&netif);
 
   IP4_ADDR(&gw, 192,168,1,1);
@@ -481,6 +526,7 @@ main(int argc, char **argv)
 #if PPPOL2TP_SUPPORT
 	{
 		ip_addr_t l2tpserv;
+		ip6_addr_t l2tpservip6;
 /*		sys_msleep(5000); */
 		printf("L2TP Started\n");
 /*		l2tpserv.addr = PP_HTONL(0xC0A80101);*/ /* 192.168.1.1 */
@@ -489,6 +535,13 @@ main(int argc, char **argv)
 
 		memset(&pppl2tpnetif, 0, sizeof(struct netif));
 		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
+/*
+		l2tpservip6.addr[0] = PP_HTONL(0x20010000);
+		l2tpservip6.addr[1] = PP_HTONL(0x00000000);
+		l2tpservip6.addr[2] = PP_HTONL(0x00000000);
+		l2tpservip6.addr[3] = PP_HTONL(0x00000001);
+		pppl2tp = pppapi_pppol2tp_create_ip6(&pppl2tpnetif, &netif, &l2tpservip6, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
+*/
 		ppp_set_notify_phase_callback(pppl2tp, ppp_notify_phase_cb);
 		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_EAP, username2, password2);
 		pppapi_set_default(pppl2tp);
@@ -496,7 +549,6 @@ main(int argc, char **argv)
 		printf("PPPoL2TP ID = %d\n", pppl2tp->netif->num);
 #endif
 		ppp_connect(pppl2tp, 0);
-		/* pppapi_pppol2tp_open(pppl2tp, NULL, &l2tpserv, 1701, NULL, 0, ppp_link_status_cb, NULL); */
 	}
 #endif
 
@@ -579,6 +631,7 @@ main(int argc, char **argv)
 #endif /* PPP_INPROC_MULTITHREADED */
     }
 
+#if 0
 	coin++;
         if(!(coin%1000)) printf("COIN %d\n", coin);
 	if(coin == 2000) {
@@ -592,6 +645,8 @@ main(int argc, char **argv)
 	if( !(coin % 2000)) {
 		pppapi_close(ppp, 0);
 	}
+#endif
+
 #endif
   }
 

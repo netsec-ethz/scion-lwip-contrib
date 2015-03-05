@@ -65,6 +65,7 @@
 #include "lwip/mem.h"
 #include "lwip/timers.h"
 #include "netif/etharp.h"
+#include "lwip/ethip6.h"
 
 #include "mintapif.h"
 
@@ -311,6 +312,9 @@ mintapif_init(struct netif *netif)
   netif->name[0] = IFNAME0;
   netif->name[1] = IFNAME1;
   netif->output = etharp_output;
+#if LWIP_IPV6
+  netif->output_ip6 = ethip6_output;
+#endif
   netif->linkoutput = low_level_output;
   netif->mtu = 1500;
   
