@@ -215,14 +215,14 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #endif /* LWIP_DNS */
 #if PPP_IPV4_SUPPORT
 			printf("ppp_link_status_cb[%d]: PPPERR_NONE\n", pppif->num);
-			printf("   our_ipaddr  = %s\n", ip_ntoa(&pppif->ip_addr));
-			printf("   his_ipaddr  = %s\n", ip_ntoa(&pppif->gw));
-			printf("   netmask     = %s\n", ip_ntoa(&pppif->netmask));
+			printf("   our_ipaddr  = %s\n", ipaddr_ntoa(&pppif->ip_addr));
+			printf("   his_ipaddr  = %s\n", ipaddr_ntoa(&pppif->gw));
+			printf("   netmask     = %s\n", ipaddr_ntoa(&pppif->netmask));
 #if LWIP_DNS
 			ns = dns_getserver(0);
-			printf("   dns1        = %s\n", ip_ntoa(&ns));
+			printf("   dns1        = %s\n", ipaddr_ntoa(&ns));
 			ns = dns_getserver(1);
-			printf("   dns2        = %s\n", ip_ntoa(&ns));
+			printf("   dns2        = %s\n", ipaddr_ntoa(&ns));
 #endif /* LWIP_DNS */
 #endif /* PPP_IPV4_SUPPORT */
 #if PPP_IPV6_SUPPORT
