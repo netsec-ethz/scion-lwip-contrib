@@ -49,9 +49,11 @@
 
 #include "lwip/ip.h"
 #include "lwip/ip_frag.h"
+#include "lwip/mld6.h"
 #include "lwip/udp.h"
 #include "lwip/snmp_msg.h"
 #include "lwip/tcp_impl.h"
+#include "lwip/dns.h"
 #include "mintapif.h"
 #include "netif/etharp.h"
 #include "lwip/pppapi.h"
@@ -153,140 +155,145 @@ static void tcpip_init_done(void *arg)
 }
 
 static void ppp_notify_phase_cb(ppp_pcb *pcb, u8_t phase, void *ctx) {
+	struct netif *pppif = ppp_netif(pcb);
 	LWIP_UNUSED_ARG(ctx);
 
 	switch(phase) {
 		case PPP_PHASE_DEAD:
-			printf("ppp_notify_phase_cb[%d]: DEAD(%d)\n", pcb->netif->num, PPP_PHASE_DEAD);
+			printf("ppp_notify_phase_cb[%d]: DEAD(%d)\n", pppif->num, PPP_PHASE_DEAD);
 			break;
 		case PPP_PHASE_INITIALIZE:
-			printf("ppp_notify_phase_cb[%d]: INITIALIZE(%d)\n", pcb->netif->num, PPP_PHASE_INITIALIZE);
+			printf("ppp_notify_phase_cb[%d]: INITIALIZE(%d)\n", pppif->num, PPP_PHASE_INITIALIZE);
 			break;
 		case PPP_PHASE_SERIALCONN:
-			printf("ppp_notify_phase_cb[%d]: SERIALCONN(%d)\n", pcb->netif->num, PPP_PHASE_SERIALCONN);
+			printf("ppp_notify_phase_cb[%d]: SERIALCONN(%d)\n", pppif->num, PPP_PHASE_SERIALCONN);
 			break;
 		case PPP_PHASE_DORMANT:
-			printf("ppp_notify_phase_cb[%d]: DORMANT(%d)\n", pcb->netif->num, PPP_PHASE_DORMANT);
+			printf("ppp_notify_phase_cb[%d]: DORMANT(%d)\n", pppif->num, PPP_PHASE_DORMANT);
 			break;
 		case PPP_PHASE_ESTABLISH:
-			printf("ppp_notify_phase_cb[%d]: ESTABLISH(%d)\n", pcb->netif->num, PPP_PHASE_ESTABLISH);
+			printf("ppp_notify_phase_cb[%d]: ESTABLISH(%d)\n", pppif->num, PPP_PHASE_ESTABLISH);
 			break;
 		case PPP_PHASE_AUTHENTICATE:
-			printf("ppp_notify_phase_cb[%d]: AUTHENTICATE(%d)\n", pcb->netif->num, PPP_PHASE_AUTHENTICATE);
+			printf("ppp_notify_phase_cb[%d]: AUTHENTICATE(%d)\n", pppif->num, PPP_PHASE_AUTHENTICATE);
 			break;
 		case PPP_PHASE_CALLBACK:
-			printf("ppp_notify_phase_cb[%d]: CALLBACK(%d)\n", pcb->netif->num, PPP_PHASE_CALLBACK);
+			printf("ppp_notify_phase_cb[%d]: CALLBACK(%d)\n", pppif->num, PPP_PHASE_CALLBACK);
 			break;
 		case PPP_PHASE_NETWORK:
-			printf("ppp_notify_phase_cb[%d]: NETWORK(%d)\n", pcb->netif->num, PPP_PHASE_NETWORK);
+			printf("ppp_notify_phase_cb[%d]: NETWORK(%d)\n", pppif->num, PPP_PHASE_NETWORK);
 			break;
 		case PPP_PHASE_RUNNING:
-			printf("ppp_notify_phase_cb[%d]: RUNNING(%d)\n", pcb->netif->num, PPP_PHASE_RUNNING);
+			printf("ppp_notify_phase_cb[%d]: RUNNING(%d)\n", pppif->num, PPP_PHASE_RUNNING);
 			break;
 		case PPP_PHASE_TERMINATE:
-			printf("ppp_notify_phase_cb[%d]: TERMINATE(%d)\n", pcb->netif->num, PPP_PHASE_TERMINATE);
+			printf("ppp_notify_phase_cb[%d]: TERMINATE(%d)\n", pppif->num, PPP_PHASE_TERMINATE);
 			break;
 		case PPP_PHASE_DISCONNECT:
-			printf("ppp_notify_phase_cb[%d]: DISCONNECT(%d)\n", pcb->netif->num, PPP_PHASE_DISCONNECT);
+			printf("ppp_notify_phase_cb[%d]: DISCONNECT(%d)\n", pppif->num, PPP_PHASE_DISCONNECT);
 			break;
 		case PPP_PHASE_HOLDOFF:
-			printf("ppp_notify_phase_cb[%d]: HOLDOFF(%d)\n", pcb->netif->num, PPP_PHASE_HOLDOFF);
+			printf("ppp_notify_phase_cb[%d]: HOLDOFF(%d)\n", pppif->num, PPP_PHASE_HOLDOFF);
 			break;
 		case PPP_PHASE_MASTER:
-			printf("ppp_notify_phase_cb[%d]: HOLDOFF(%d)\n", pcb->netif->num, PPP_PHASE_HOLDOFF);
+			printf("ppp_notify_phase_cb[%d]: HOLDOFF(%d)\n", pppif->num, PPP_PHASE_HOLDOFF);
 			break;
 		default:
-			printf("ppp_notify_phase_cb[%d]: Unknown phase %d\n", pcb->netif->num, phase);
+			printf("ppp_notify_phase_cb[%d]: Unknown phase %d\n", pppif->num, phase);
 			break;
 	}
 }
 
 static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
+	struct netif *pppif = ppp_netif(pcb);
 	LWIP_UNUSED_ARG(ctx);
 
 	switch(err_code) {
 		case PPPERR_NONE: {             /* No error. */
-			struct ppp_addrs *ppp_addrs = ppp_addrs(pcb);
-			struct netif *netif = ppp_netif(pcb);
+#if LWIP_DNS
+			ip_addr_t ns;
+#endif /* LWIP_DNS */
 #if PPP_IPV4_SUPPORT
-			printf("ppp_link_status_cb[%d]: PPPERR_NONE\n", pcb->netif->num);
-			printf("   our_ipaddr  = %s\n", ip_ntoa(&ppp_addrs->our_ipaddr));
-			printf("   his_ipaddr  = %s\n", ip_ntoa(&ppp_addrs->his_ipaddr));
-			printf("   netmask     = %s\n", ip_ntoa(&ppp_addrs->netmask));
-			printf("   dns1        = %s\n", ip_ntoa(&ppp_addrs->dns1));
-			printf("   dns2        = %s\n", ip_ntoa(&ppp_addrs->dns2));
+			printf("ppp_link_status_cb[%d]: PPPERR_NONE\n", pppif->num);
+			printf("   our_ipaddr  = %s\n", ip_ntoa(&pppif->ip_addr));
+			printf("   his_ipaddr  = %s\n", ip_ntoa(&pppif->gw));
+			printf("   netmask     = %s\n", ip_ntoa(&pppif->netmask));
+#if LWIP_DNS
+			ns = dns_getserver(0);
+			printf("   dns1        = %s\n", ip_ntoa(&ns));
+			ns = dns_getserver(1);
+			printf("   dns2        = %s\n", ip_ntoa(&ns));
+#endif /* LWIP_DNS */
 #endif /* PPP_IPV4_SUPPORT */
 #if PPP_IPV6_SUPPORT
-			printf("   our6_ipaddr = %s\n", ip6addr_ntoa(&ppp_addrs->our6_ipaddr));
-			printf("   his6_ipaddr = %s\n", ip6addr_ntoa(&ppp_addrs->his6_ipaddr));
+			printf("   our6_ipaddr = %s\n", ip6addr_ntoa(netif_ip6_addr(pppif, 0)));
 			if (err_code == PPPERR_NONE && pcb == pppoe) {
-				netif->ip6_addr[1].addr[0] = PP_HTONL(0x20010000);
-				netif->ip6_addr[1].addr[1] = PP_HTONL(0x00000000);
-				netif->ip6_addr[1].addr[2] = PP_HTONL(0x00000000);
-				netif->ip6_addr[1].addr[3] = PP_HTONL(0x00010002);
-				/* netif_ip6_addr_set_state(netif, 1, IP6_ADDR_PREFERRED); */
-				netif_ip6_addr_set_state(netif, 1, IP6_ADDR_PREFERRED);
+				pppif->ip6_addr[1].addr[0] = PP_HTONL(0x20010000);
+				pppif->ip6_addr[1].addr[1] = PP_HTONL(0x00000000);
+				pppif->ip6_addr[1].addr[2] = PP_HTONL(0x00000000);
+				pppif->ip6_addr[1].addr[3] = PP_HTONL(0x00010002);
+				/* netif_ip6_addr_set_state(pppif, 1, IP6_ADDR_PREFERRED); */
+				netif_ip6_addr_set_state(pppif, 1, IP6_ADDR_PREFERRED);
 			}
 #endif /* PPP_IPV6_SUPPORT */
 			break;
 		}
 		case PPPERR_PARAM: {           /* Invalid parameter. */
-			printf("ppp_link_status_cb[%d]: PPPERR_PARAM\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_PARAM\n", pppif->num);
 			break;
 		}
 		case PPPERR_OPEN: {            /* Unable to open PPP session. */
-			printf("ppp_link_status_cb[%d]: PPPERR_OPEN\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_OPEN\n", pppif->num);
 			break;
 		}
 		case PPPERR_DEVICE: {          /* Invalid I/O device for PPP. */
-			printf("ppp_link_status_cb[%d]: PPPERR_DEVICE\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_DEVICE\n", pppif->num);
 			break;
 		}
 		case PPPERR_ALLOC: {           /* Unable to allocate resources. */
-			printf("ppp_link_status_cb[%d]: PPPERR_ALLOC\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_ALLOC\n", pppif->num);
 			break;
 		}
 		case PPPERR_USER: {            /* User interrupt. */
-			printf("ppp_link_status_cb[%d]: PPPERR_USER\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_USER\n", pppif->num);
 			break;
 		}
 		case PPPERR_CONNECT: {         /* Connection lost. */
-			printf("ppp_link_status_cb[%d]: PPPERR_CONNECT\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_CONNECT\n", pppif->num);
 			break;
 		}
 		case PPPERR_AUTHFAIL: {        /* Failed authentication challenge. */
-			printf("ppp_link_status_cb[%d]: PPPERR_AUTHFAIL\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_AUTHFAIL\n", pppif->num);
 			break;
 		}
 		case PPPERR_PROTOCOL: {        /* Failed to meet protocol. */
-			printf("ppp_link_status_cb[%d]: PPPERR_PROTOCOL\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_PROTOCOL\n", pppif->num);
 			break;
 		}
 		case PPPERR_PEERDEAD: {        /* Connection timeout. */
-			printf("ppp_link_status_cb[%d]: PPPERR_PEERDEAD\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_PEERDEAD\n", pppif->num);
 			break;
 		}
 		case PPPERR_IDLETIMEOUT: {      /* Idle Timeout. */
-			printf("ppp_link_status_cb[%d]: PPPERR_IDLETIMEOUT\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_IDLETIMEOUT\n", pppif->num);
 			break;
 		}
 		case PPPERR_CONNECTTIME: {      /* Max connect time reache. */
-			printf("ppp_link_status_cb[%d]: PPPERR_CONNECTTIME\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_CONNECTTIME\n", pppif->num);
 			break;
 		}
 		case PPPERR_LOOPBACK: {        /* Loopback detected. */
-			printf("ppp_link_status_cb[%d]: PPPERR_LOOPBACK\n", pcb->netif->num);
+			printf("ppp_link_status_cb[%d]: PPPERR_LOOPBACK\n", pppif->num);
 			break;
 		}
 		default: {
-			printf("ppp_link_status_cb[%d]: unknown err code %d\n", pcb->netif->num, err_code);
+			printf("ppp_link_status_cb[%d]: unknown err code %d\n", pppif->num, err_code);
 			break;
 		}
 	}
 
 #if PPPOE_SUPPORT
 	if(err_code == PPPERR_USER && pcb == pppoe) {
-		struct netif *pppif = ppp_netif(pcb);
 		printf("Destroying PPPoE and recreating\n");
 		ppp_free(pcb);
 		pcb = pppoe_create(pppif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
@@ -366,7 +373,9 @@ main(int argc, char **argv)
 #if PPPOS_SUPPORT
   struct netif pppsnetif;
 #endif /* PPPOS_SUPPORT */
+#if 0
   int coin = 0;
+#endif
 
   /* startup defaults (may be overridden by one or more opts) */
   IP4_ADDR(&gw, 192,168,0,1);
@@ -483,6 +492,10 @@ main(int argc, char **argv)
 #if PPP_DEBUG
 	printf("PPPoE ID = %d\n", pppoe->netif->num);
 #endif
+	/* pppoe-server skip the first packet while it is forking pppd, wait a little
+	 * before sending the first LCP packet.
+	 */
+	pppoe->settings.listen_time = 100;
 	pppapi_connect(pppoe, 0);
 #endif
 
@@ -513,8 +526,10 @@ main(int argc, char **argv)
 		IP4_ADDR(&serveraddrs.our_ipaddr,  192,168,70,1);
 		IP4_ADDR(&serveraddrs.his_ipaddr,  192,168,70,2);
 		IP4_ADDR(&serveraddrs.netmask,     255,255,255,255);
+#if LWIP_DNS
 		IP4_ADDR(&serveraddrs.dns1,        192,168,70,20);
 		IP4_ADDR(&serveraddrs.dns2,        192,168,70,21);
+#endif /* LWIP_DNS */
 #endif /* PPP_IPV4_SUPPORT */
 		pppapi_listen(pppos, &serveraddrs);
 	}
@@ -526,7 +541,7 @@ main(int argc, char **argv)
 #if PPPOL2TP_SUPPORT
 	{
 		ip_addr_t l2tpserv;
-		ip6_addr_t l2tpservip6;
+/* 		ip6_addr_t l2tpservip6; */
 /*		sys_msleep(5000); */
 		printf("L2TP Started\n");
 /*		l2tpserv.addr = PP_HTONL(0xC0A80101);*/ /* 192.168.1.1 */
