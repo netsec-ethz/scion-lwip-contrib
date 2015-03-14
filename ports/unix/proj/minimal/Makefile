@@ -31,19 +31,18 @@
  
 CCDEP=gcc
 CC=gcc
-#To compile for linux: make ARCH=linux
-#To compile for cygwin: make ARCH=cygwin
-#To compile for openbsd: make ARCH=openbsd
-#ARCH=openbsd
-ARCH=linux
-#CFLAGS=-g -Wall -pedantic -D$(ARCH) -DIPv4 -Os -fpack-struct -DLWIP_DEBUG -lpthread 
+#To compile for openbsd: make UNIXARCH=OPENBSD
+#To compile for cygwin: make UNIXARCH=CYGWIN
+UNIXARCH ?= LINUX
+#CFLAGS=-g -Wall -pedantic -D$(ARCH) -DIPv4 -Os -fpack-struct -DLWIP_DEBUG -lpthread
 #CFLAGS=-g -Wall -D$(ARCH) -DIPv4 -Os -fpack-struct -DLWIP_DEBUG -lpthread -ldl -lcrypt -DHAVE_PATHS_H -DIPX_CHANGE -DHAVE_MMAP -DCHAPMS=1 -DMPPE=1 -DHAS_SHADOW -DHAVE_CRYPT_H=1 -DUSE_CRYPT=1 -DHAVE_MULTILINK -DUSE_TDB=1 -DPLUGIN -DMAXOCTETS -DDESTDIR="/usr/local"
 #CFLAGS=-ggdb -Wall -pedantic -D$(ARCH) -DIPv4 -Os -DLWIP_DEBUG -DDEBUGALL -lpthread
-CFLAGS=-ggdb -Wextra -Wall -pedantic -Wparentheses -Wsequence-point -Wswitch-default \
+CFLAGS=-ggdb -Wall -DLWIP_UNIX_$(UNIXARCH) -Os -DLWIP_DEBUG -pedantic \
+	-Wparentheses -Wsequence-point -Wswitch-default \
 	-Wextra -Wundef -Wshadow -Wpointer-arith -Wbad-function-cast \
 	-Wc++-compat -Wwrite-strings -Wold-style-definition \
 	-Wmissing-prototypes -Wredundant-decls -Wnested-externs -Wno-address \
-	-D$(ARCH) -DIPv4 -DLWIP_DEBUG -DDEBUGALL -lpthread -lutil
+	-lpthread -lutil
 ARFLAGS=rs
 
 CONTRIBDIR=../../../..
