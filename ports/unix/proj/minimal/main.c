@@ -83,6 +83,8 @@ int to_pppd[2], from_pppd[2];
 
 struct netif netif;
 struct netif netif2;
+
+#if PPP_SUPPORT
 const char *username = "essai", *password = "aon0viipheehooX";
 #if PPPOE_SUPPORT
   ppp_pcb *pppoe;
@@ -94,6 +96,7 @@ const char *username = "essai", *password = "aon0viipheehooX";
   ppp_pcb *pppos;
   sio_status_t *ser;
 #endif /* PPPOS_SUPPORT */
+#endif /* PPP_SUPPORT */
 
 /* 'non-volatile' SNMP settings
   @todo: make these truly non-volatile */
@@ -154,6 +157,7 @@ static void tcpip_init_done(void *arg)
   sys_sem_signal(&sem); /* Signal the waiting thread that the TCP/IP init is done. */
 }
 
+#if PPP_SUPPORT
 static void ppp_notify_phase_cb(ppp_pcb *pcb, u8_t phase, void *ctx) {
 	struct netif *pppif = ppp_netif(pcb);
 	LWIP_UNUSED_ARG(ctx);
@@ -227,6 +231,7 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #endif /* PPP_IPV4_SUPPORT */
 #if PPP_IPV6_SUPPORT
 			printf("   our6_ipaddr = %s\n", ip6addr_ntoa(netif_ip6_addr(pppif, 0)));
+#if PPPOE_SUPPORT
 			if (err_code == PPPERR_NONE && pcb == pppoe) {
 				pppif->ip6_addr[1].addr[0] = PP_HTONL(0x20010000);
 				pppif->ip6_addr[1].addr[1] = PP_HTONL(0x00000000);
@@ -235,6 +240,7 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 				/* netif_ip6_addr_set_state(pppif, 1, IP6_ADDR_PREFERRED); */
 				netif_ip6_addr_set_state(pppif, 1, IP6_ADDR_PREFERRED);
 			}
+#endif /* PPPOE_SUPPORT */
 #endif /* PPP_IPV6_SUPPORT */
 			break;
 		}
@@ -346,6 +352,8 @@ void sio_input(ppp_pcb *pcb) {
 }
 #endif
 
+#endif /* PPP_SUPPORT */
+
 #if LWIP_SNMP
 static void
 snmp_increment(void *arg)
@@ -362,6 +370,7 @@ main(int argc, char **argv)
   int ch;
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
   sys_sem_t sem;
+#if PPP_SUPPORT
   /* const char *username2 = "essai2", *password2 = "aon0viipheehooX"; */
   const char *username2 = "essai10", *password2 = "essai10pass";
 #if PPPOE_SUPPORT
@@ -376,6 +385,7 @@ main(int argc, char **argv)
 #if 0
   int coin = 0;
 #endif
+#endif /* PPP_SUPPORT */
 
   /* startup defaults (may be overridden by one or more opts) */
   IP4_ADDR(&gw, 192,168,0,1);
@@ -482,6 +492,7 @@ main(int argc, char **argv)
 
   printf("Applications started.\n");
 
+#if PPP_SUPPORT
 	printf("ppp_pcb sizeof(ppp) = %ld\n", sizeof(ppp_pcb));
 
 #if PPPOE_SUPPORT
@@ -514,6 +525,7 @@ main(int argc, char **argv)
 	pppos = pppapi_pppos_create(&pppsnetif, ser, ppp_link_status_cb, NULL);
 	ppp_set_notify_phase_callback(pppos, ppp_notify_phase_cb);
 
+	pppos->settings.listen_time = 100;
 	pppapi_set_auth(pppos, PPPAUTHTYPE_MSCHAP, username2, password2);
 	pppapi_set_default(pppos);
 #if PPP_DEBUG
@@ -586,6 +598,9 @@ main(int argc, char **argv)
 			break;
 	}
 #endif
+
+#endif /* PPP_SUPPORT */
+
 #if 0
   while (1) {
 	mintapif_wait(&netif, 0xFFFF);
@@ -610,6 +625,8 @@ main(int argc, char **argv)
     FD_SET(mintapif2->fd, &fdset);
 
     maxfd = LWIP_MAX(mintapif->fd, mintapif2->fd);
+
+#if PPP_SUPPORT
 #if 0
     FD_SET(from_pppd[0], &fdset);
 #endif
@@ -618,32 +635,41 @@ main(int argc, char **argv)
       FD_SET(ser->fd, &fdset);
       maxfd = LWIP_MAX(maxfd, ser->fd);
     }
-#endif /* PPP_INPROC_MULTITHREADED */
+#endif /* PPPOS_SUPPORT */
+#endif /* PPP_SUPPORT */
+
     ret = select( maxfd + 1, &fdset, NULL, NULL, &tv);
     if(ret > 0) {
       if( FD_ISSET(mintapif->fd, &fdset) )
         mintapif_input(&netif);
       if( FD_ISSET(mintapif2->fd, &fdset) )
         mintapif_input(&netif2);
+
+#if PPP_SUPPORT
 #if 0
       if( FD_ISSET(from_pppd[0], &fdset) )
         sio_input(ppps);
 #endif
 #if PPPOS_SUPPORT
       if(pppos && ser && FD_ISSET(ser->fd, &fdset) ) {
-        u8_t buffer[128];
+        u8_t buffer[1024];
         int len;
-        len = sio_read(ser, buffer, 128);
+        len = sio_read(ser, buffer, 1024);
 	if(len < 0) {
 	  close(ser->fd);
 	  ser->fd = -1;
 	  ser = NULL;
 	  pppapi_close(pppos, 1);
 	} else {
-          pppos_input(pppos, buffer, len);
+#if PPP_INPROC_MULTITHREADED
+	  pppos_input(pppos, buffer, len);
+#else /* PPP_INPROC_MULTITHREADED */
+	  pppos_input_tcpip(pppos, buffer, len);
+#endif /* PPP_INPROC_MULTITHREADED */
 	}
       }
-#endif /* PPP_INPROC_MULTITHREADED */
+#endif /* PPPOS_SUPPORT */
+#endif /* PPP_SUPPORT */
     }
 
 #if 0
