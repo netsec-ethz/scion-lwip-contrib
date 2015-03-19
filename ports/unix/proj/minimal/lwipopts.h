@@ -407,8 +407,8 @@
 
 
 /* ---------- IPv6 options ---------- */
-#define LWIP_IPV6      1
-#define LWIP_IPV6_FRAG  1
+#define LWIP_IPV6      0
+#define LWIP_IPV6_FRAG  0
 
 
 #define SIO_DEBUG LWIP_DBG_OFF
@@ -424,6 +424,8 @@
  * PPP_SUPPORT==1: Enable PPP.
  */
 #define PPP_SUPPORT                     1
+
+#if PPP_SUPPORT
 
 /**
  * PPPOE_SUPPORT==1: Enable PPP Over Ethernet
@@ -449,11 +451,6 @@
  * buffer are required, allowing you to use a smaller PBUF_POOL_BUFSIZE.
  */
 #define PPP_USE_PBUF_RAM                1
-
-/**
- * NUM_PPP: Max PPP sessions.
- */
-#define NUM_PPP                         10
 
 /**
  * PAP_SUPPORT==1: Support PAP.
@@ -484,6 +481,7 @@
  * CCP_SUPPORT==1: Support CCP. CURRENTLY NOT SUPPORTED! DO NOT SET!
  */
 #define CCP_SUPPORT                     0
+/* #define MPPE 0 */
 
 /**
  * ECP_SUPPORT==1: Support ECP. CURRENTLY NOT SUPPORTED! DO NOT SET!
@@ -506,27 +504,30 @@
 #define PRINTPKT_SUPPORT		1
 
 #define PPP_IPV4_SUPPORT 1
-#define PPP_IPV6_SUPPORT 1
+#define PPP_IPV6_SUPPORT 0
 
 #define PPP_SERVER 0
 
 #define MEMP_NUM_PPP_PCB 10
 #define MEMP_NUM_PPPOE_INTERFACES 2
 
-#define PPP_INPROC_MULTITHREADED 0
+#define PPP_INPROC_IRQ_SAFE 0
 
 #define PPP_FCS_TABLE 1
 
 #define LWIP_PPP_API 1
 
+#define PPP_NOTIFY_PHASE 1
+
+#define PPP_PROTOCOLNAME  1
+
+#endif /* PPP_SUPPORT */
+
+
 #define LWIP_NETIF_STATUS_CALLBACK 1
 #define LWIP_NETIF_LINK_CALLBACK 1
 
 #define LWIP_NETIF_API 1
-
-#define PPP_NOTIFY_PHASE 1
-
-#define PPP_PROTOCOLNAME  1
 
 #define TCP_MSS 100
 /* #define TCP_WND 8400 */
