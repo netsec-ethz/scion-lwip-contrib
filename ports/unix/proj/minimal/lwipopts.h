@@ -407,8 +407,8 @@
 
 
 /* ---------- IPv6 options ---------- */
-#define LWIP_IPV6      0
-#define LWIP_IPV6_FRAG  0
+#define LWIP_IPV6      1
+#define LWIP_IPV6_FRAG  1
 
 
 #define SIO_DEBUG LWIP_DBG_OFF
@@ -480,8 +480,8 @@
 /**
  * CCP_SUPPORT==1: Support CCP. CURRENTLY NOT SUPPORTED! DO NOT SET!
  */
-#define CCP_SUPPORT                     0
-/* #define MPPE 0 */
+#define CCP_SUPPORT                     1
+#define MPPE_SUPPORT                    1
 
 /**
  * ECP_SUPPORT==1: Support ECP. CURRENTLY NOT SUPPORTED! DO NOT SET!
@@ -504,7 +504,7 @@
 #define PRINTPKT_SUPPORT		1
 
 #define PPP_IPV4_SUPPORT 1
-#define PPP_IPV6_SUPPORT 0
+#define PPP_IPV6_SUPPORT 1
 
 #define PPP_SERVER 0
 
