@@ -68,7 +68,7 @@
 #include "lwip/tcpip.h"
 
 /* (manual) host IP configuration */
-static ip_addr_t ipaddr, netmask, gw;
+static ip4_addr_t ipaddr, netmask, gw;
 
 #if LWIP_SNMP
 /* SNMP trap destination cmd option */
@@ -414,13 +414,13 @@ main(int argc, char **argv)
         exit(0);
         break;
       case 'g':
-        ipaddr_aton(optarg, &gw);
+        ip4addr_aton(optarg, &gw);
         break;
       case 'i':
-        ipaddr_aton(optarg, &ipaddr);
+        ip4addr_aton(optarg, &ipaddr);
         break;
       case 'm':
-        ipaddr_aton(optarg, &netmask);
+        ip4addr_aton(optarg, &netmask);
         break;
       case 't':
 #if LWIP_SNMP
@@ -442,9 +442,9 @@ main(int argc, char **argv)
   argc -= optind;
   argv += optind;
 
-  strncpy(ip_str, ipaddr_ntoa(&ipaddr), sizeof(ip_str));
-  strncpy(nm_str, ipaddr_ntoa(&netmask), sizeof(nm_str));
-  strncpy(gw_str, ipaddr_ntoa(&gw), sizeof(gw_str));
+  strncpy(ip_str, ip4addr_ntoa(&ipaddr), sizeof(ip_str));
+  strncpy(nm_str, ip4addr_ntoa(&netmask), sizeof(nm_str));
+  strncpy(gw_str, ip4addr_ntoa(&gw), sizeof(gw_str));
   printf("Host at %s mask %s gateway %s\n", ip_str, nm_str, gw_str);
 
 
