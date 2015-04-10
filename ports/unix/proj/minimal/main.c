@@ -225,9 +225,9 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #endif /* LWIP_DNS */
 #if PPP_IPV4_SUPPORT
 			printf("ppp_link_status_cb[%d]: PPPERR_NONE\n", pppif->num);
-			printf("   our_ipaddr  = %s\n", ipaddr_ntoa(&pppif->ip_addr));
-			printf("   his_ipaddr  = %s\n", ipaddr_ntoa(&pppif->gw));
-			printf("   netmask     = %s\n", ipaddr_ntoa(&pppif->netmask));
+			printf("   our_ipaddr  = %s\n", ip4addr_ntoa(&pppif->ip_addr));
+			printf("   his_ipaddr  = %s\n", ip4addr_ntoa(&pppif->gw));
+			printf("   netmask     = %s\n", ip4addr_ntoa(&pppif->netmask));
 #if LWIP_DNS
 			ns = dns_getserver(0);
 			printf("   dns1        = %s\n", ipaddr_ntoa(&ns));
@@ -562,13 +562,13 @@ main(int argc, char **argv)
 
 #if PPPOL2TP_SUPPORT
 	{
-		ip_addr_t l2tpserv;
+		ip4_addr_t l2tpserv;
 /* 		ip6_addr_t l2tpservip6; */
 /*		sys_msleep(5000); */
 		printf("L2TP Started\n");
-/*		l2tpserv.addr = PP_HTONL(0xC0A80101);*/ /* 192.168.1.1 */
-		l2tpserv.addr = PP_HTONL(0xC0A804fe); /* 192.168.4.254 */
-/* 		l2tpserv.addr = PP_HTONL(0x0A010A00);*/ /* 10.1.10.0 */
+/*		IP4_ADDR(&l2tpserv, 192,168,1,1); */
+		IP4_ADDR(&l2tpserv, 192,168,4,254);
+/* 		IP4_ADDR(&l2tpserv, 10,1,10,0); */
 
 		memset(&pppl2tpnetif, 0, sizeof(struct netif));
 		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
