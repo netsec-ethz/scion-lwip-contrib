@@ -377,8 +377,10 @@ main(int argc, char **argv)
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
   sys_sem_t sem;
 #if PPP_SUPPORT
+#if PPPOL2TP_SUPPORT || PPPOS_SUPPORT
   /* const char *username2 = "essai2", *password2 = "aon0viipheehooX"; */
   const char *username2 = "essai10", *password2 = "essai10pass";
+#endif /* PPPOL2TP_SUPPORT || PPPOS_SUPPORT */
 #if PPPOE_SUPPORT
   struct netif pppnetif;
 #endif
@@ -562,23 +564,23 @@ main(int argc, char **argv)
 
 #if PPPOL2TP_SUPPORT
 	{
-		ip4_addr_t l2tpserv;
-/* 		ip6_addr_t l2tpservip6; */
+		ip_addr_t l2tpserv;
 /*		sys_msleep(5000); */
 		printf("L2TP Started\n");
-/*		IP4_ADDR(&l2tpserv, 192,168,1,1); */
-		IP4_ADDR(&l2tpserv, 192,168,4,254);
-/* 		IP4_ADDR(&l2tpserv, 10,1,10,0); */
+/*		IP_ADDR4(&l2tpserv, 192,168,1,1); */
+		IP_ADDR4(&l2tpserv, 192,168,4,254);
+/* 		IP_ADDR4(&l2tpserv, 10,1,10,0); */
 
 		memset(&pppl2tpnetif, 0, sizeof(struct netif));
+#if 0
+		IP_ADDR6(&l2tpserv, 0, 0x20,0x01,0x00,0x00);
+		IP_ADDR6(&l2tpserv, 1, 0x00,0x00,0x00,0x00);
+		IP_ADDR6(&l2tpserv, 2, 0x00,0x00,0x00,0x00);
+		IP_ADDR6(&l2tpserv, 3, 0x00,0x00,0x00,0x01);
+#endif
 		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
-/*
-		l2tpservip6.addr[0] = PP_HTONL(0x20010000);
-		l2tpservip6.addr[1] = PP_HTONL(0x00000000);
-		l2tpservip6.addr[2] = PP_HTONL(0x00000000);
-		l2tpservip6.addr[3] = PP_HTONL(0x00000001);
-		pppl2tp = pppapi_pppol2tp_create_ip6(&pppl2tpnetif, &netif, &l2tpservip6, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
-*/
+/* 		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, &netif, &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL); */
+
 		ppp_set_notify_phase_callback(pppl2tp, ppp_notify_phase_cb);
 		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_EAP, username2, password2);
 		pppapi_set_default(pppl2tp);
