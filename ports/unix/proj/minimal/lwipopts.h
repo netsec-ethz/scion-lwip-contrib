@@ -407,7 +407,7 @@
 
 
 /* ---------- IPv6 options ---------- */
-#define LWIP_IPV6      1
+#define LWIP_IPV6       1
 #define LWIP_IPV6_FRAG  1
 
 
@@ -435,7 +435,7 @@
 /**
  * PPPOS_SUPPORT==1: Enable PPP Over Serial
  */
-#define PPPOS_SUPPORT                   1
+#define PPPOS_SUPPORT                   0
 
 #define PPPOL2TP_SUPPORT                1
 #define PPPOL2TP_AUTH_SUPPORT           1
@@ -506,7 +506,7 @@
 #define PPP_IPV4_SUPPORT 1
 #define PPP_IPV6_SUPPORT 1
 
-#define PPP_SERVER 0
+#define PPP_SERVER 1
 
 #define MEMP_NUM_PPP_PCB 10
 #define MEMP_NUM_PPPOE_INTERFACES 2

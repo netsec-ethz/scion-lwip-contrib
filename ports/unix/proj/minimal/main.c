@@ -220,9 +220,9 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 
 	switch(err_code) {
 		case PPPERR_NONE: {             /* No error. */
-#if LWIP_DNS
+#if PPP_IPV4_SUPPORT && LWIP_DNS
 			ip_addr_t ns;
-#endif /* LWIP_DNS */
+#endif /* PPP_IPV4_SUPPORT && LWIP_DNS */
 #if PPP_IPV4_SUPPORT
 			printf("ppp_link_status_cb[%d]: PPPERR_NONE\n", pppif->num);
 			printf("   our_ipaddr  = %s\n", ip4addr_ntoa(&pppif->ip_addr));
@@ -511,8 +511,11 @@ main(int argc, char **argv)
 	memset(&pppnetif, 0, sizeof(struct netif));
 	pppoe = pppapi_pppoe_create(&pppnetif, &netif, NULL, NULL, ppp_link_status_cb, NULL);
 	ppp_set_notify_phase_callback(pppoe, ppp_notify_phase_cb);
-	pppapi_set_auth(pppoe, PPPAUTHTYPE_EAP, username, password);
-#if PPP_DEBUG
+	pppapi_set_auth(pppoe, PPPAUTHTYPE_MSCHAP_V2, username, password);
+#if MPPE_SUPPORT
+	pppoe->settings.require_mppe = 1;
+#endif /* MPPE_SUPPORT */
+	#if PPP_DEBUG
 	printf("PPPoE ID = %d\n", pppoe->netif->num);
 #endif
 	/* pppoe-server skip the first packet while it is forking pppd, wait a little
@@ -565,13 +568,12 @@ main(int argc, char **argv)
 #if PPPOL2TP_SUPPORT
 	{
 		ip_addr_t l2tpserv;
-/*		sys_msleep(5000); */
+		memset(&pppl2tpnetif, 0, sizeof(struct netif));
 		printf("L2TP Started\n");
+
 /*		IP_ADDR4(&l2tpserv, 192,168,1,1); */
 		IP_ADDR4(&l2tpserv, 192,168,4,254);
 /* 		IP_ADDR4(&l2tpserv, 10,1,10,0); */
-
-		memset(&pppl2tpnetif, 0, sizeof(struct netif));
 #if 0
 		IP_ADDR6(&l2tpserv, 0, 0x20,0x01,0x00,0x00);
 		IP_ADDR6(&l2tpserv, 1, 0x00,0x00,0x00,0x00);
@@ -579,7 +581,7 @@ main(int argc, char **argv)
 		IP_ADDR6(&l2tpserv, 3, 0x00,0x00,0x00,0x01);
 #endif
 		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
-/* 		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, &netif, &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL); */
+/*		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, &netif, &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL); */
 
 		ppp_set_notify_phase_callback(pppl2tp, ppp_notify_phase_cb);
 		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_EAP, username2, password2);
