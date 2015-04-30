@@ -295,8 +295,8 @@
  * LWIP_SNMP==1: Turn on SNMP module. UDP must be available for SNMP
  * transport.
  */
-#define LWIP_SNMP                       1
-#define SNMP_PRIVATE_MIB                1
+#define LWIP_SNMP                       0
+#define SNMP_PRIVATE_MIB                0
 
 /*
    ----------------------------------
@@ -528,6 +528,17 @@
 #define LWIP_NETIF_LINK_CALLBACK 1
 
 #define LWIP_NETIF_API 1
+
+#define PBUF_LINK_ENCAPSULATION_HLEN 128
+
+/* 1500
+ *  - PPPoE(6) - PPP Protocol(2)
+ *   - MPPE Header(2) - PPP Protocol(2)
+ *    - IPv4 header(20) - UDP Header(8)
+ *     - L2TP Header(6) - HDLC Header(2) - PPP Protocol(2)
+ *      - MPPE Header(2) - PPP Protocol(2)
+ */
+#define PPPOL2TP_DEFMRU 1446
 
 #define TCP_MSS 100
 /* #define TCP_WND 8400 */

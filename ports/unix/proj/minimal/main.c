@@ -571,24 +571,31 @@ main(int argc, char **argv)
 		memset(&pppl2tpnetif, 0, sizeof(struct netif));
 		printf("L2TP Started\n");
 
-/*		IP_ADDR4(&l2tpserv, 192,168,1,1); */
-		IP_ADDR4(&l2tpserv, 192,168,4,254);
-/* 		IP_ADDR4(&l2tpserv, 10,1,10,0); */
 #if 0
 		IP_ADDR6(&l2tpserv, 0, 0x20,0x01,0x00,0x00);
 		IP_ADDR6(&l2tpserv, 1, 0x00,0x00,0x00,0x00);
 		IP_ADDR6(&l2tpserv, 2, 0x00,0x00,0x00,0x00);
 		IP_ADDR6(&l2tpserv, 3, 0x00,0x00,0x00,0x01);
 #endif
+#if PPPOE_SUPPORT
+		IP_ADDR4(&l2tpserv, 192,168,4,254);
+/*		IP_ADDR4(&l2tpserv, 192,168,1,1); */
+/* 		IP_ADDR4(&l2tpserv, 10,1,10,0); */
 		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
-/*		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, &netif, &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL); */
+#else /* PPPOE_SUPPORT */
+		IP_ADDR4(&l2tpserv, 192,168,0,1);
+		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, &netif, &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
+#endif /* PPPOE_SUPPORT */
 
 		ppp_set_notify_phase_callback(pppl2tp, ppp_notify_phase_cb);
-		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_EAP, username2, password2);
+		pppapi_set_auth(pppl2tp, PPPAUTHTYPE_MSCHAP_V2, username2, password2);
 		pppapi_set_default(pppl2tp);
 #if PPP_DEBUG
 		printf("PPPoL2TP ID = %d\n", pppl2tp->netif->num);
 #endif
+#if MPPE_SUPPORT
+		pppl2tp->settings.require_mppe = 1;
+#endif /* MPPE_SUPPORT */
 		ppp_connect(pppl2tp, 0);
 	}
 #endif
