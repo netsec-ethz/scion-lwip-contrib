@@ -96,7 +96,7 @@ low_level_init(struct netif *netif)
 
   /* device capabilities */
   /* don't set NETIF_FLAG_ETHARP if this device is not an ethernet one */
-  netif->flags |= NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP;
+  netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP;
 
   /* Do whatever else is needed to initialize interface. */  
   
@@ -119,6 +119,7 @@ low_level_init(struct netif *netif)
     }
   }
 #endif /* Linux */
+  netif_set_link_up(netif);
 
   if(netif->num == 0) {
     snprintf(buf, sizeof(buf), "/sbin/ifconfig " IFCONFIG_ARGS,
@@ -146,6 +147,7 @@ low_level_init(struct netif *netif)
 
   mintapif->lasttime = 0;
 
+  netif_set_up(netif);
 }
 /*-----------------------------------------------------------------------------------*/
 /*

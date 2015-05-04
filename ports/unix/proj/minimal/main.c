@@ -484,9 +484,23 @@ main(int argc, char **argv)
 
   netifapi_netif_set_up(&netif);
 
+
   IP4_ADDR(&gw, 192,168,1,1);
   IP4_ADDR(&ipaddr, 192,168,1,2);
   IP4_ADDR(&netmask, 255,255,255,0);
+
+#if SNMP_PRIVATE_MIB != 0
+  /* initialize our private example MIB */
+  lwip_privmib_init();
+#endif
+#if LWIP_SNMP
+  snmp_trap_dst_ip_set(0,&trap_addr);
+  snmp_trap_dst_enable(0,trap_flag);
+  snmp_set_syscontact(syscontact_str,&syscontact_len);
+  snmp_set_syslocation(syslocation_str,&syslocation_len);
+  snmp_set_snmpenableauthentraps(&snmpauthentraps_set);
+  snmp_init();
+#endif
 
   netifapi_netif_add(&netif2, &ipaddr, &netmask, &gw, NULL, mintapif_init, tcpip_input);
   netifapi_netif_set_up(&netif2);
