@@ -530,7 +530,7 @@ extern unsigned char debug_flags;
 /**
  * PPP_MD5_RANDM==1: Use MD5 for better randomness.
  */
-#define PPP_MD5_RANDM			0
+#define PPP_MD5_RANDM			1
 
 #define LCP_ECHOINTERVAL		30
 #define LCP_MAXECHOFAILS		4
@@ -576,5 +576,7 @@ extern unsigned char debug_flags;
 
 #define TCP_MSS 100
 /* #define TCP_WND 8400 */
+
+#define IPV6_FRAG_COPYHEADER 1
 
 #endif /* LWIP_LWIPOPTS_H */
