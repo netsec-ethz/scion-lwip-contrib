@@ -111,6 +111,13 @@
 #define PCAPIF_HANDLE_LINKSTATE       1
 #endif
 
+/** If 1, use PBUF_REF for RX (for testing purposes mainly).
+ * For this, LWIP_SUPPORT_CUSTOM_PBUF must be enabled.
+ */
+#ifndef PCAPIF_RX_REF
+#define PCAPIF_RX_REF                 0
+#endif
+
 /** This can be used when netif->state is used for something else in your
  * application (e.g. when wrapping a class around this interface). Just
  * make sure this define returns the state pointer set by
@@ -170,6 +177,14 @@ struct pcapif_private {
   enum pcapifh_link_event last_link_event;
 #endif /* PCAPIF_HANDLE_LINKSTATE */
 };
+
+#if PCAPIF_RX_REF
+struct pcapif_pbuf_custom
+{
+   struct pbuf_custom pc;
+   struct pbuf* p;
+};
+#endif /* PCAPIF_RX_REF */
 
 /* Forward declarations. */
 static void pcapif_input(u_char *user, const struct pcap_pkthdr *pkt_header, const u_char *packet);
@@ -790,6 +805,33 @@ pcapif_low_level_input(struct netif *netif, const void *packet, int packet_len)
   return p;
 }
 
+#if PCAPIF_RX_REF
+static void
+pcapif_rx_pbuf_free_custom(struct pbuf *p)
+{
+  LWIP_ASSERT("NULL pointer", p != NULL);
+  mem_free(p);
+}
+
+static struct pbuf*
+pcapif_rx_ref(struct pbuf* p)
+{
+  struct pcapif_pbuf_custom* ppc;
+  struct pbuf* q;
+
+  LWIP_ASSERT("NULL pointer", p != NULL);
+  LWIP_ASSERT("chained pbuf not supported here", p->next == NULL);
+
+  ppc = (struct pcapif_pbuf_custom*)mem_malloc(sizeof(struct pcapif_pbuf_custom));
+  LWIP_ASSERT("out of memory for RX", ppc != NULL);
+  ppc->pc.custom_free_function = pcapif_rx_pbuf_free_custom;
+
+  q = pbuf_alloced_custom(PBUF_RAW, p->tot_len, PBUF_REF, &ppc->pc, p->payload, p->tot_len);
+  LWIP_ASSERT("pbuf_alloced_custom returned NULL", q != NULL);
+  return q;
+}
+#endif /* PCAPIF_RX_REF */
+
 /** pcapif_input: This function is called when a packet is ready to be read
  * from the interface. It uses the function low_level_input() that should
  * handle the actual reception of bytes from the network interface.
@@ -808,6 +850,9 @@ pcapif_input(u_char *user, const struct pcap_pkthdr *pkt_header, const u_char *p
   p = pcapif_low_level_input(netif, packet, packet_len);
   /* no packet could be read, silently ignore this */
   if (p != NULL) {
+#if PCAPIF_RX_REF
+    p = pcapif_rx_ref(p);
+#endif
     /* pass all packets to ethernet_input, which decides what packets it supports */
     if (netif->input(p, netif) != ERR_OK) {
       LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));
