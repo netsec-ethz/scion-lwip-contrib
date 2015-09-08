@@ -3,7 +3,7 @@
 
 #include "lwip/opt.h"
 
-#if LWIP_SOCKET
+#if LWIP_SOCKET && LWIP_IPV4
 
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
@@ -522,7 +522,8 @@ sockex_testtwoselects(void *arg)
 }
 
 #if !SOCKET_EXAMPLES_RUN_PARALLEL
-void socket_example_test(void* arg)
+static void
+socket_example_test(void* arg)
 {
   LWIP_UNUSED_ARG(arg);
   sockex_nonblocking_connect(NULL);
