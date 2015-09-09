@@ -145,18 +145,18 @@ static void tcpip_init_done(void *arg)
 {
   sys_sem_t sem = (sys_sem_t)arg;
 
-#if LWIP_SNMP
 #if SNMP_PRIVATE_MIB != 0
   /* initialize our private example MIB */
   lwip_privmib_init();
 #endif
+#if LWIP_SNMP
   snmp_trap_dst_ip_set(0,&trap_addr);
   snmp_trap_dst_enable(0,trap_flag);
-  snmp_set_syscontact(syscontact_str,&syscontact_len);
-  snmp_set_syslocation(syslocation_str,&syslocation_len);
+  snmp_set_syscontact(syscontact_str,&syscontact_len,sizeof syscontact_str);
+  snmp_set_syslocation(syslocation_str,&syslocation_len,sizeof syslocation_str);
   snmp_set_snmpenableauthentraps(&snmpauthentraps_set);
   snmp_init();
-#endif /* LWIP_SNMP */
+#endif
 
   echo_init();
 
@@ -360,16 +360,6 @@ void sio_input(ppp_pcb *pcb) {
 
 #endif /* PPP_SUPPORT */
 
-#if LWIP_SNMP
-static void
-snmp_increment(void *arg)
-{
-  LWIP_UNUSED_ARG(arg);
-  snmp_inc_sysuptime();
-  sys_timeout(10, snmp_increment, NULL);
-} 
-#endif /* LWIP_SNMP */
-
 int
 main(int argc, char **argv)
 {
@@ -496,23 +486,6 @@ main(int argc, char **argv)
 #endif
   printf("netif2 %d\n", netif2.num);
 #endif
-
-#if SNMP_PRIVATE_MIB != 0
-  /* initialize our private example MIB */
-  lwip_privmib_init();
-#endif
-#if LWIP_SNMP
-  snmp_trap_dst_ip_set(0,&trap_addr);
-  snmp_trap_dst_enable(0,trap_flag);
-  snmp_set_syscontact(syscontact_str,&syscontact_len,sizeof syscontact_str);
-  snmp_set_syslocation(syslocation_str,&syslocation_len,sizeof syslocation_str);
-  snmp_set_snmpenableauthentraps(&snmpauthentraps_set);
-  snmp_init();
-#endif
-
-#if LWIP_SNMP
-  sys_timeout(10, snmp_increment, NULL);
-#endif /* LWIP_SNMP */
 
   printf("Applications started.\n");
 

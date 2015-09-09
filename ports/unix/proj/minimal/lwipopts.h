@@ -295,8 +295,8 @@
  * LWIP_SNMP==1: Turn on SNMP module. UDP must be available for SNMP
  * transport.
  */
-#define LWIP_SNMP                       0
-#define SNMP_PRIVATE_MIB                0
+#define LWIP_SNMP                       1
+#define SNMP_PRIVATE_MIB                1
 
 /*
    ----------------------------------
@@ -401,7 +401,7 @@
 /**
  * LWIP_STATS==1: Enable statistics collection in lwip_stats.
  */
-#define LWIP_STATS                      0
+#define LWIP_STATS                      1
 
 /*
    ---------------------------------------
