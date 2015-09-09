@@ -33,6 +33,7 @@
 #include <unistd.h>
 #include <getopt.h>
 
+#include "lwip/sio.h"
 #include "netif/sio.h"
 
 #include "lwip/opt.h"
@@ -96,7 +97,7 @@ const char *username = "essai", *password = "aon0viipheehooX";
 #endif
 #if PPPOS_SUPPORT
   ppp_pcb *pppos;
-  sio_status_t *ser;
+  sio_fd_t ser;
 #endif /* PPPOS_SUPPORT */
 #endif /* PPP_SUPPORT */
 
