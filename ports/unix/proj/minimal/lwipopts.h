@@ -48,7 +48,7 @@
  * NO_SYS==1: Provides VERY minimal functionality. Otherwise,
  * use lwIP facilities.
  */
-#define NO_SYS                          1
+#define NO_SYS                          0
 
 
 /*
@@ -61,13 +61,20 @@
  *    4 byte alignment -> #define MEM_ALIGNMENT 4
  *    2 byte alignment -> #define MEM_ALIGNMENT 2
  */
-#define MEM_ALIGNMENT                   1
+#define MEM_ALIGNMENT                   4
 
 /**
  * MEM_SIZE: the size of the heap memory. If the application will send
  * a lot of data that needs to be copied, this should be set high.
  */
 #define MEM_SIZE                        16000
+
+/*
+ * enable SYS_LIGHTWEIGHT_PROT in lwipopts.h if you want inter-task protection
+ * for certain critical regions during buffer allocation, deallocation and memory
+ * allocation and deallocation.
+ */
+#define SYS_LIGHTWEIGHT_PROT            1
 
 
 /*
@@ -99,7 +106,7 @@
  * MEMP_NUM_TCP_PCB: the number of simulatenously active TCP connections.
  * (requires the LWIP_TCP option)
  */
-#define MEMP_NUM_TCP_PCB                2
+#define MEMP_NUM_TCP_PCB                16
 
 /**
  * MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP connections.
@@ -128,7 +135,7 @@
  *
  * To this default value, 1 was added for the snmp_increment timer.
  */
-#define MEMP_NUM_SYS_TIMEOUT            (LWIP_TCP + IP_REASSEMBLY + LWIP_ARP + (2*LWIP_DHCP) + LWIP_AUTOIP + LWIP_IGMP + LWIP_DNS + PPP_SUPPORT + (LWIP_IPV6 ? (1 + LWIP_IPV6_REASS + LWIP_IPV6_MLD) : 0)) + 1
+/* #define MEMP_NUM_SYS_TIMEOUT            (LWIP_TCP + IP_REASSEMBLY + LWIP_ARP + (2*LWIP_DHCP) + LWIP_AUTOIP + LWIP_IGMP + LWIP_DNS + PPP_SUPPORT + (LWIP_IPV6 ? (1 + LWIP_IPV6_REASS + LWIP_IPV6_MLD) : 0)) + 1 */
 
 /**
  * MEMP_NUM_NETBUF: the number of struct netbufs.
@@ -147,19 +154,21 @@
  * for callback/timeout API communication. 
  * (only needed if you use tcpip.c)
  */
-#define MEMP_NUM_TCPIP_MSG_API          0
+/* #define MEMP_NUM_TCPIP_MSG_API          0 */
 
 /**
  * MEMP_NUM_TCPIP_MSG_INPKT: the number of struct tcpip_msg, which are used
  * for incoming packets. 
  * (only needed if you use tcpip.c)
  */
-#define MEMP_NUM_TCPIP_MSG_INPKT        0
+/* #define MEMP_NUM_TCPIP_MSG_INPKT        0 */
 
 /**
  * PBUF_POOL_SIZE: the number of buffers in the pbuf pool. 
  */
-#define PBUF_POOL_SIZE                  32
+#define PBUF_POOL_SIZE                  64
+
+#define PBUF_POOL_BUFSIZE  512
 
 /*
    ---------------------------------
@@ -181,7 +190,7 @@
  * interfaces. If you are going to run lwIP on a device with only one network
  * interface, define this to 0.
  */
-#define IP_FORWARD                      0
+#define IP_FORWARD                      1
 
 /**
  * IP_OPTIONS: Defines the behavior for IP options.
@@ -286,8 +295,8 @@
  * LWIP_SNMP==1: Turn on SNMP module. UDP must be available for SNMP
  * transport.
  */
-#define LWIP_SNMP                       1
-#define SNMP_PRIVATE_MIB                1
+#define LWIP_SNMP                       0
+#define SNMP_PRIVATE_MIB                0
 
 /*
    ----------------------------------
@@ -308,7 +317,7 @@
  * LWIP_DNS==1: Turn on DNS module. UDP must be available for DNS
  * transport.
  */
-#define LWIP_DNS                        0
+#define LWIP_DNS                        1
 
 /*
    ---------------------------------
@@ -429,5 +438,145 @@
 
 extern unsigned char debug_flags;
 #define LWIP_DBG_TYPES_ON debug_flags
+
+
+/* ---------- IPv6 options ---------- */
+#define LWIP_IPV6       1
+#define LWIP_IPV6_FRAG  1
+
+
+#define SIO_DEBUG LWIP_DBG_OFF
+#define PPP_DEBUG LWIP_DBG_ON
+#define IP6_DEBUG LWIP_DBG_OFF
+
+/*
+   ---------------------------------
+   ---------- PPP options ----------
+   ---------------------------------
+*/
+/**
+ * PPP_SUPPORT==1: Enable PPP.
+ */
+#define PPP_SUPPORT                     1
+
+#if PPP_SUPPORT
+
+/**
+ * PPPOE_SUPPORT==1: Enable PPP Over Ethernet
+ */
+#define PPPOE_SUPPORT                   1
+
+/**
+ * PPPOS_SUPPORT==1: Enable PPP Over Serial
+ */
+#define PPPOS_SUPPORT                   0
+
+#define PPPOL2TP_SUPPORT                1
+#define PPPOL2TP_AUTH_SUPPORT           1
+
+/**
+ * pbuf_type PPP is using for LCP, PAP, CHAP, EAP, IPCP and IP6CP packets.
+ *
+ * Memory allocated must be single buffered for PPP to works, it requires pbuf
+ * that are not going to be chained when allocated. This requires setting
+ * PBUF_POOL_BUFSIZE to at least 512 bytes, which is quite huge for small systems.
+ *
+ * Setting PPP_USE_PBUF_RAM to 1 makes PPP use memory from heap where continuous
+ * buffer are required, allowing you to use a smaller PBUF_POOL_BUFSIZE.
+ */
+#define PPP_USE_PBUF_RAM                1
+
+/**
+ * PAP_SUPPORT==1: Support PAP.
+ */
+#define PAP_SUPPORT                     1
+
+/**
+ * CHAP_SUPPORT==1: Support CHAP.
+ */
+#define CHAP_SUPPORT                    1
+
+/**
+ * MSCHAP_SUPPORT==1: Support MSCHAP.
+ */
+#define MSCHAP_SUPPORT                  1
+
+/**
+ * EAP_SUPPORT==1: Support EAP.
+ */
+#define EAP_SUPPORT			1
+
+/**
+ * CBCP_SUPPORT==1: Support CBCP. CURRENTLY NOT SUPPORTED! DO NOT SET!
+ */
+#define CBCP_SUPPORT			0
+
+/**
+ * CCP_SUPPORT==1: Support CCP. CURRENTLY NOT SUPPORTED! DO NOT SET!
+ */
+#define CCP_SUPPORT                     1
+#define MPPE_SUPPORT                    1
+
+/**
+ * ECP_SUPPORT==1: Support ECP. CURRENTLY NOT SUPPORTED! DO NOT SET!
+ */
+#define ECP_SUPPORT			0
+
+/**
+ * VJ_SUPPORT==1: Support VJ header compression.
+ */
+#define VJ_SUPPORT                      1
+
+/**
+ * PPP_MD5_RANDM==1: Use MD5 for better randomness.
+ */
+#define PPP_MD5_RANDM			1
+
+#define LCP_ECHOINTERVAL		30
+#define LCP_MAXECHOFAILS		4
+
+#define PRINTPKT_SUPPORT		1
+
+#define PPP_IPV4_SUPPORT 1
+#define PPP_IPV6_SUPPORT 1
+
+#define PPP_SERVER 1
+
+#define MEMP_NUM_PPP_PCB 10
+#define MEMP_NUM_PPPOE_INTERFACES 2
+
+#define PPP_INPROC_IRQ_SAFE 0
+
+#define PPP_FCS_TABLE 1
+
+#define LWIP_PPP_API 1
+
+#define PPP_NOTIFY_PHASE 1
+
+#define PPP_PROTOCOLNAME  1
+
+#endif /* PPP_SUPPORT */
+
+
+#define LWIP_NETIF_STATUS_CALLBACK 1
+#define LWIP_NETIF_LINK_CALLBACK 1
+
+#define LWIP_NETIF_API 1
+
+#define PBUF_LINK_ENCAPSULATION_HLEN 128
+
+/* 1500
+ *  - PPPoE(6) - PPP Protocol(2)
+ *   - MPPE Header(2) - PPP Protocol(2)
+ *    - IPv4 header(20) - UDP Header(8)
+ *     - L2TP Header(6) - HDLC Header(2) - PPP Protocol(2)
+ *      - MPPE Header(2) - PPP Protocol(2)
+ */
+#define PPPOL2TP_DEFMRU 1446
+
+#define TCP_MSS 100
+/* #define TCP_WND 8400 */
+
+#define IPV6_FRAG_COPYHEADER 1
 
 #endif /* LWIP_LWIPOPTS_H */
