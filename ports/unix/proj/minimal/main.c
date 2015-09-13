@@ -361,6 +361,13 @@ void sio_input(ppp_pcb *pcb) {
 
 #endif /* PPP_SUPPORT */
 
+#if PPPOS_SUPPORT
+static u32_t pppos_out(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx) {
+  LWIP_UNUSED_ARG(pcb);
+  return sio_write((sio_fd_t)ctx, data, len);
+}
+#endif/* PPPOS_SUPPORT */
+
 int
 main(int argc, char **argv)
 {
@@ -523,7 +530,7 @@ main(int argc, char **argv)
 #endif /* PPP_SERVER */
 	printf("SIO FD = %d\n", ser->fd);
 
-	pppos = pppapi_pppos_create(&pppsnetif, ser, ppp_link_status_cb, NULL);
+	pppos = pppapi_pppos_create(&pppsnetif, pppos_out, ppp_link_status_cb, ser);
 	ppp_set_notify_phase_callback(pppos, ppp_notify_phase_cb);
 
 	pppos->settings.listen_time = 100;
