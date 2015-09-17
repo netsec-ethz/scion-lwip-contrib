@@ -246,17 +246,19 @@ static u32_t
 ppp_output_cb(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx)
 {
   LWIP_UNUSED_ARG(pcb);
-  return sio_write((sio_fd_t)ctx, data, len);
+  LWIP_UNUSED_ARG(ctx);
+  return sio_write(ppp_sio, data, len);
 }
 #endif /* PPPOS_SUPPORT */
 #endif /* PPP_SUPPORT */
 
 #if LWIP_NETIF_STATUS_CALLBACK
-void status_callback(struct netif *netif)
+static void
+status_callback(struct netif *state_netif)
 {
-  if (netif_is_up(netif)) {
+  if (netif_is_up(state_netif)) {
 #if LWIP_IPV4
-    printf("status_callback==UP, local interface IP is %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+    printf("status_callback==UP, local interface IP is %s\n", ip4addr_ntoa(netif_ip4_addr(state_netif)));
 #else
     printf("status_callback==UP\n");
 #endif
@@ -267,9 +269,10 @@ void status_callback(struct netif *netif)
 #endif /* LWIP_NETIF_STATUS_CALLBACK */
 
 #if LWIP_NETIF_LINK_CALLBACK
-void link_callback(struct netif *netif)
+static void
+link_callback(struct netif *state_netif)
 {
-  if (netif_is_link_up(netif)) {
+  if (netif_is_link_up(state_netif)) {
     printf("link_callback==UP\n");
   } else {
     printf("link_callback==DOWN\n");
@@ -286,10 +289,14 @@ msvc_netif_init(void)
 #endif /* LWIP_IPV4 && USE_ETHERNET */
 #if USE_SLIPIF
   u8_t num_slip1 = 0;
+#if LWIP_IPV4
   ip4_addr_t ipaddr_slip1, netmask_slip1, gw_slip1;
+#endif
 #if USE_SLIPIF > 1
   u8_t num_slip2 = 1;
+#if LWIP_IPV4
   ip4_addr_t ipaddr_slip2, netmask_slip2, gw_slip2;
+#endif
 #endif /* USE_SLIPIF > 1 */
 #endif /* USE_SLIPIF */
 #if USE_DHCP || USE_AUTOIP
@@ -310,7 +317,7 @@ msvc_netif_init(void)
   if (ppp_sio == NULL) {
     printf("sio_open error\n");
   } else {
-    ppp = pppos_create(&ppp_netif, ppp_output_cb, pppLinkStatusCallback, ppp_sio);
+    ppp = pppos_create(&ppp_netif, ppp_output_cb, pppLinkStatusCallback, NULL);
     if (ppp == NULL) {
       printf("pppos_create error\n");
     } else {
@@ -400,14 +407,20 @@ msvc_netif_init(void)
 
 #endif /* USE_ETHERNET */
 #if USE_SLIPIF
+#if LWIP_IPV4
+#define SLIP1_ADDRS &ipaddr_slip1, &netmask_slip1, &gw_slip1,
   LWIP_PORT_INIT_SLIP1_IPADDR(&ipaddr_slip1);
   LWIP_PORT_INIT_SLIP1_GW(&gw_slip1);
   LWIP_PORT_INIT_SLIP1_NETMASK(&netmask_slip1);
   printf("Starting lwIP slipif, local interface IP is %s\n", ip4addr_ntoa(&ipaddr_slip1));
-#if SIO_USE_COMPORT
+#else
+#define SLIP1_ADDRS
+  printf("Starting lwIP slipif\n");
+#endif
+#if defined(SIO_USE_COMPORT) && SIO_USE_COMPORT
   num_slip1++; /* COM ports cannot be 0-based */
 #endif
-  netif_add(&slipif1, &ipaddr_slip1, &netmask_slip1, &gw_slip1, &num_slip1, slipif_init, ip_input);
+  netif_add(&slipif1, SLIP1_ADDRS &num_slip1, slipif_init, ip_input);
 #if !USE_ETHERNET
   netif_set_default(&slipif1);
 #endif /* !USE_ETHERNET */
@@ -426,14 +439,20 @@ msvc_netif_init(void)
   netif_set_up(&slipif1);
 
 #if USE_SLIPIF > 1
+#if LWIP_IPV4
+#define SLIP1_ADDRS &ipaddr_slip1, &netmask_slip1, &gw_slip1,
   LWIP_PORT_INIT_SLIP2_IPADDR(&ipaddr_slip2);
   LWIP_PORT_INIT_SLIP2_GW(&gw_slip2);
   LWIP_PORT_INIT_SLIP2_NETMASK(&netmask_slip2);
   printf("Starting lwIP SLIP if #2, local interface IP is %s\n", ip4addr_ntoa(&ipaddr_slip2));
-#if SIO_USE_COMPORT
+#else
+#define SLIP2_ADDRS
+  printf("Starting lwIP SLIP if #2\n");
+#endif
+#if defined(SIO_USE_COMPORT) && SIO_USE_COMPORT
   num_slip2++; /* COM ports cannot be 0-based */
 #endif
-  netif_add(&slipif2, &ipaddr_slip2, &netmask_slip2, &gw_slip2, &num_slip2, slipif_init, ip_input);
+  netif_add(&slipif2, SLIP2_ADDRS &num_slip2, slipif_init, ip_input);
 #if LWIP_IPV6
   netif_create_ip6_linklocal_address(&slipif1, 1);
   printf("SLIP2 ip6 linklocal address: ");
@@ -452,15 +471,17 @@ msvc_netif_init(void)
 }
 
 #if LWIP_DNS_APP && LWIP_DNS
-void dns_found(const char *name, ip_addr_t *addr, void *arg)
+static void
+dns_found(const char *name, ip_addr_t *addr, void *arg)
 {
   LWIP_UNUSED_ARG(arg);
   printf("%s: %s\n", name, addr ? ipaddr_ntoa(addr) : "<not found>");
 }
 
-void dns_dorequest(void *arg)
+static void
+dns_dorequest(void *arg)
 {
-  char* dnsname = "3com.com";
+  const char* dnsname = "3com.com";
   ip_addr_t dnsresp;
   LWIP_UNUSED_ARG(arg);
  
@@ -564,7 +585,8 @@ test_init(void * arg)
  * a dedicated task that waits for packets to arrive. This would normally be
  * done from interrupt context with embedded hardware, but we don't get an
  * interrupt in windows for that :-) */
-void main_loop(void)
+static void
+main_loop(void)
 {
 #if !NO_SYS
   err_t err;
@@ -584,6 +606,7 @@ void main_loop(void)
   test_init(NULL);
 #else /* NO_SYS */
   err = sys_sem_new(&init_sem, 0);
+  LWIP_ASSERT("failed to create init_sem", err == ERR_OK);
   tcpip_init(test_init, &init_sem);
   /* we have to wait for initialization to finish before
    * calling update_adapter()! */
