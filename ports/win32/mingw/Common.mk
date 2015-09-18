@@ -32,10 +32,7 @@
 CCDEP=gcc
 CC=gcc
 
-#To compile for openbsd: make UNIXARCH=OPENBSD
-#To compile for cygwin: make UNIXARCH=CYGWIN
-UNIXARCH ?= LINUX
-CFLAGS=-g -Wall -DLWIP_UNIX_$(UNIXARCH) -DLWIP_DEBUG -pedantic -Werror \
+CFLAGS=-g -Wall -DLWIP_DEBUG -pedantic -Werror \
 	-Wparentheses -Wsequence-point -Wswitch-default \
 	-Wextra -Wundef -Wshadow -Wpointer-arith -Wcast-qual \
 	-Wc++-compat -Wwrite-strings -Wold-style-definition -Wcast-align \
@@ -45,20 +42,19 @@ CFLAGS=-g -Wall -DLWIP_UNIX_$(UNIXARCH) -DLWIP_DEBUG -pedantic -Werror \
 # -Wpacked
 # -ansi
 # -std=c89
-LDFLAGS=-pthread -lutil
-CONTRIBDIR=../../../..
-LWIPARCH=$(CONTRIBDIR)/ports/unix
+LDFLAGS=-L$(PCAP_DIR)/lib -lwpcap -lpacket
+CONTRIBDIR=../../..
+LWIPARCH=$(CONTRIBDIR)/ports/win32
 ARFLAGS=rs
 
 #Set this to where you have the lwip core module checked out from CVS
 #default assumes it's a dir named lwip at the same level as the contrib module
 LWIPDIR=$(CONTRIBDIR)/../lwip/src
 
+PCAPDIR=$(PCAP_DIR)/Include
+
 CFLAGS:=$(CFLAGS) \
-	-I. -I$(CONTRIBDIR)/apps/httpserver_raw -I$(CONTRIBDIR)/apps/shell \
-	-I$(CONTRIBDIR)/apps/tcpecho -I$(CONTRIBDIR)/apps/udpecho \
-	-I$(CONTRIBDIR)/apps/snmp_private_mib \
-	-I$(CONTRIBDIR)/apps/tcpecho_raw \
+	-I. -I$(CONTRIBDIR)  -I$(PCAPDIR) \
 	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
@@ -107,9 +103,8 @@ NETIFFILES+=$(LWIPDIR)/netif/ppp/auth.c $(LWIPDIR)/netif/ppp/ccp.c \
 	$(LWIPDIR)/netif/ppp/polarssl/sha1.c
 
 # ARCHFILES: Architecture specific files.
-ARCHFILES=$(wildcard $(LWIPARCH)/*.c) $(LWIPARCH)/netif/tapif.c $(LWIPARCH)/netif/tunif.c \
-	$(LWIPARCH)/netif/unixif.c $(LWIPARCH)/netif/list.c $(LWIPARCH)/netif/tcpdump.c \
-	$(LWIPARCH)/netif/delif.c $(LWIPARCH)/netif/sio.c $(LWIPARCH)/netif/fifo.c
+#ARCHFILES=$(wildcard $(LWIPARCH)/*.c)
+ARCHFILES=$(LWIPARCH)/sys_arch.c $(LWIPARCH)/test.c $(LWIPARCH)/pcapif.c $(LWIPARCH)/pcapif_helper.c $(LWIPARCH)/sio.c
 
 # APPFILES: Applications.
 APPFILES=$(CONTRIBDIR)/apps/httpserver_raw/fs.c $(CONTRIBDIR)/apps/httpserver_raw/httpd.c \
@@ -124,8 +119,9 @@ APPFILES=$(CONTRIBDIR)/apps/httpserver_raw/fs.c $(CONTRIBDIR)/apps/httpserver_ra
 
 # LWIPFILES: All the above.
 LWIPFILES=$(COREFILES) $(CORE4FILES) $(CORE6FILES) $(SNMPFILES) $(APIFILES) $(NETIFFILES) $(ARCHFILES)
-LWIPFILESW=$(wildcard $(LWIPFILES))
-LWIPOBJS=$(notdir $(LWIPFILESW:.c=.o))
+#LWIPFILESW=$(wildcard $(LWIPFILES))
+LWIPOBJS=$(notdir $(LWIPFILES:.c=.o))
+#LWIPOBJS=$(LWIPFILES:.c=.o)
 
 LWIPLIBCOMMON=liblwipcommon.a
 $(LWIPLIBCOMMON): $(LWIPOBJS)
@@ -133,8 +129,14 @@ $(LWIPLIBCOMMON): $(LWIPOBJS)
 
 APPLIB=liblwipapps.a
 APPOBJS=$(notdir $(APPFILES:.c=.o))
+#APPOBJS=$(APPFILES:.c=.o)
 $(APPLIB): $(APPOBJS)
 	$(AR) $(ARFLAGS) $(APPLIB) $?
 
 %.o:
 	$(CC) $(CFLAGS) -c $(<:.o=.c)
+
+pcapif.o:
+	$(CC) $(CFLAGS) -Wno-error -Wno-redundant-decls -c $(<:.o=.c)
+pcapif_helper.o:
+	$(CC) $(CFLAGS) -std=c99 -Wno-redundant-decls -c $(<:.o=.c)
