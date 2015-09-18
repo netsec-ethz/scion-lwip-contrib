@@ -574,10 +574,10 @@ main(int argc, char **argv)
 		IP_ADDR4(&l2tpserv, 192,168,4,254);
 /*		IP_ADDR4(&l2tpserv, 192,168,1,1); */
 /* 		IP_ADDR4(&l2tpserv, 10,1,10,0); */
-		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
+		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, ppp_netif(pppoe), &l2tpserv, 1701, (const u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
 #else /* PPPOE_SUPPORT */
 		IP_ADDR4(&l2tpserv, 192,168,0,1);
-		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, &netif, &l2tpserv, 1701, (u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
+		pppl2tp = pppapi_pppol2tp_create(&pppl2tpnetif, &netif, &l2tpserv, 1701, (const u8_t*)"ahah", 4, ppp_link_status_cb, NULL);
 #endif /* PPPOE_SUPPORT */
 
 		ppp_set_notify_phase_callback(pppl2tp, ppp_notify_phase_cb);

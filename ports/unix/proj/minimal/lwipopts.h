@@ -469,7 +469,7 @@ extern unsigned char debug_flags;
 /**
  * PPPOS_SUPPORT==1: Enable PPP Over Serial
  */
-#define PPPOS_SUPPORT                   0
+#define PPPOS_SUPPORT                   1
 
 #define PPPOL2TP_SUPPORT                1
 #define PPPOL2TP_AUTH_SUPPORT           1
