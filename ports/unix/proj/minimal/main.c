@@ -226,9 +226,9 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 #endif /* PPP_IPV4_SUPPORT && LWIP_DNS */
 #if PPP_IPV4_SUPPORT
 			printf("ppp_link_status_cb[%d]: PPPERR_NONE\n", pppif->num);
-			printf("   our_ipaddr  = %s\n", ip4addr_ntoa(&pppif->ip_addr));
-			printf("   his_ipaddr  = %s\n", ip4addr_ntoa(&pppif->gw));
-			printf("   netmask     = %s\n", ip4addr_ntoa(&pppif->netmask));
+			printf("   our_ipaddr  = %s\n", ip4addr_ntoa(netif_ip4_addr(pppif)));
+			printf("   his_ipaddr  = %s\n", ip4addr_ntoa(netif_ip4_gw(pppif)));
+			printf("   netmask     = %s\n", ip4addr_ntoa(netif_ip4_netmask(pppif)));
 #if LWIP_DNS
 			ns = dns_getserver(0);
 			printf("   dns1        = %s\n", ipaddr_ntoa(&ns));
@@ -240,11 +240,7 @@ static void ppp_link_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
 			printf("   our6_ipaddr = %s\n", ip6addr_ntoa(netif_ip6_addr(pppif, 0)));
 #if PPPOE_SUPPORT
 			if (err_code == PPPERR_NONE && pcb == pppoe) {
-				pppif->ip6_addr[1].addr[0] = PP_HTONL(0x20010000);
-				pppif->ip6_addr[1].addr[1] = PP_HTONL(0x00000000);
-				pppif->ip6_addr[1].addr[2] = PP_HTONL(0x00000000);
-				pppif->ip6_addr[1].addr[3] = PP_HTONL(0x00010002);
-				/* netif_ip6_addr_set_state(pppif, 1, IP6_ADDR_PREFERRED); */
+				IP6_ADDR((ip6_addr_t*)&pppif->ip6_addr[1], PP_HTONL(0x20010000), PP_HTONL(0x00000000), PP_HTONL(0x00000000), PP_HTONL(0x00010002));
 				netif_ip6_addr_set_state(pppif, 1, IP6_ADDR_PREFERRED);
 			}
 #endif /* PPPOE_SUPPORT */
@@ -467,10 +463,7 @@ main(int argc, char **argv)
   {
 #if LWIP_IPV6
 	ip6_addr_t multicast_address;
-	netif.ip6_addr[1].addr[0] = PP_HTONL(0x20010000);
-	netif.ip6_addr[1].addr[1] = PP_HTONL(0x00000000);
-	netif.ip6_addr[1].addr[2] = PP_HTONL(0x00000000);
-	netif.ip6_addr[1].addr[3] = PP_HTONL(0x00000002);
+	IP6_ADDR((ip6_addr_t*)&netif.ip6_addr[1], PP_HTONL(0x20010000), PP_HTONL(0x00000000), PP_HTONL(0x00000000), PP_HTONL(0x00000002));
 	netif_ip6_addr_set_state(&netif, 1, IP6_ADDR_PREFERRED);
 	ip6_addr_set_solicitednode(&multicast_address, netif_ip6_addr(&netif, 1)->addr[3]);
 	mld6_joingroup(netif_ip6_addr(&netif, 1), &multicast_address);
