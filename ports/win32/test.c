@@ -48,6 +48,7 @@
 #include "lwip/init.h"
 #include "lwip/tcpip.h"
 #include "lwip/netif.h"
+#include "lwip/api.h"
 
 #include "lwip/tcp.h"
 #include "lwip/udp.h"
@@ -59,13 +60,14 @@
 #include "netif/etharp.h"
 
 /* applications includes */
+#include "lwip/apps/lwiperf.h"
+#include "lwip/apps/netbiosns.h"
+#include "lwip/apps/sntp.h"
 #include "apps/httpserver_raw/httpd.h"
 #include "apps/httpserver/httpserver-netconn.h"
 #include "apps/netio/netio.h"
-#include "apps/netbios/netbios.h"
 #include "apps/ping/ping.h"
 #include "apps/rtp/rtp.h"
-#include "apps/sntp/sntp.h"
 #include "apps/chargen/chargen.h"
 #include "apps/shell/shell.h"
 #include "apps/tcpecho/tcpecho.h"
@@ -472,7 +474,7 @@ msvc_netif_init(void)
 
 #if LWIP_DNS_APP && LWIP_DNS
 static void
-dns_found(const char *name, ip_addr_t *addr, void *arg)
+dns_found(const char *name, const ip_addr_t *addr, void *arg)
 {
   LWIP_UNUSED_ARG(arg);
   printf("%s: %s\n", name, addr ? ipaddr_ntoa(addr) : "<not found>");
@@ -490,6 +492,21 @@ dns_dorequest(void *arg)
   }
 }
 #endif /* LWIP_DNS_APP && LWIP_DNS */
+
+#if LWIP_LWIPERF_APP
+static void
+lwiperf_report(void *arg, enum lwiperf_report_type report_type,
+  const ip_addr_t* local_addr, u16_t local_port, const ip_addr_t* remote_addr, u16_t remote_port,
+  u32_t bytes_transferred, u32_t ms_duration, u32_t bandwidth_kbitpsec)
+{
+  LWIP_UNUSED_ARG(arg);
+  LWIP_UNUSED_ARG(local_addr);
+  LWIP_UNUSED_ARG(local_port);
+
+  printf("IPERF report: type=%d, remote: %s:%d, total bytes: %lu, duration in ms: %lu, kbits/s: %lu\n",
+    (int)report_type, ipaddr_ntoa(remote_addr), (int)remote_port, bytes_transferred, ms_duration, bandwidth_kbitpsec);
+}
+#endif /* LWIP_LWIPERF_APP */
 
 /* This function initializes applications */
 static void
@@ -509,7 +526,14 @@ apps_init(void)
 #endif /* LWIP_PING_APP && LWIP_RAW && LWIP_ICMP */
 
 #if LWIP_NETBIOS_APP && LWIP_UDP
-  netbios_init();
+  netbiosns_init();
+#ifndef NETBIOS_LWIP_NAME
+#if LWIP_NETIF_HOSTNAME
+  netbiosns_set_name(netif_default->hostname);
+#else
+  netbiosns_set_name("NETBIOSLWIPDEV");
+#endif
+#endif
 #endif /* LWIP_NETBIOS_APP && LWIP_UDP */
 
 #if LWIP_HTTPD_APP && LWIP_TCP
@@ -545,6 +569,9 @@ apps_init(void)
 #if LWIP_UDPECHO_APP && LWIP_NETCONN
   udpecho_init();
 #endif /* LWIP_UDPECHO_APP && LWIP_NETCONN */
+#if LWIP_LWIPERF_APP
+  lwiperf_start_tcp_server_default(lwiperf_report, NULL);
+#endif
 #if LWIP_SOCKET_EXAMPLES_APP && LWIP_SOCKET
   socket_examples_init();
 #endif /* LWIP_SOCKET_EXAMPLES_APP && LWIP_SOCKET */

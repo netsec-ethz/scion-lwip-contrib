@@ -53,7 +53,7 @@
 #include "lwip/mld6.h"
 #include "lwip/udp.h"
 #include "lwip/snmp_msg.h"
-#include "lwip/tcp_impl.h"
+#include "lwip/tcp.h"
 #include "lwip/dns.h"
 #include "netif/tapif.h"
 #include "netif/etharp.h"

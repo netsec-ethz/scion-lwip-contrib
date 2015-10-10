@@ -45,7 +45,7 @@ CFLAGS=-g -Wall -DLWIP_UNIX_$(UNIXARCH) -DLWIP_DEBUG -pedantic -Werror \
 # -Wpacked
 # -ansi
 # -std=c89
-LDFLAGS=-pthread -lutil
+LDFLAGS=-pthread -lutil -lrt
 CONTRIBDIR=../../../..
 LWIPARCH=$(CONTRIBDIR)/ports/unix
 ARFLAGS=rs
@@ -62,13 +62,13 @@ CFLAGS:=$(CFLAGS) \
 	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
-COREFILES=$(LWIPDIR)/core/def.c $(LWIPDIR)/core/dhcp.c $(LWIPDIR)/core/dns.c \
+COREFILES=$(LWIPDIR)/core/def.c $(LWIPDIR)/core/dns.c \
 	$(LWIPDIR)/core/inet_chksum.c $(LWIPDIR)/core/init.c $(LWIPDIR)/core/mem.c \
 	$(LWIPDIR)/core/memp.c $(LWIPDIR)/core/netif.c $(LWIPDIR)/core/pbuf.c \
 	$(LWIPDIR)/core/raw.c $(LWIPDIR)/core/stats.c $(LWIPDIR)/core/sys.c \
 	$(LWIPDIR)/core/tcp.c $(LWIPDIR)/core/tcp_in.c $(LWIPDIR)/core/tcp_in.c \
 	$(LWIPDIR)/core/tcp_out.c $(LWIPDIR)/core/timers.c $(LWIPDIR)/core/udp.c
-CORE4FILES=$(LWIPDIR)/core/ipv4/autoip.c $(LWIPDIR)/core/ipv4/icmp.c \
+CORE4FILES=$(LWIPDIR)/core/ipv4/autoip.c $(LWIPDIR)/core/ipv4/dhcp.c $(LWIPDIR)/core/ipv4/icmp.c \
 	$(LWIPDIR)/core/ipv4/igmp.c $(LWIPDIR)/core/ipv4/ip_frag.c \
 	$(LWIPDIR)/core/ipv4/ip4.c $(LWIPDIR)/core/ipv4/ip4_addr.c
 CORE6FILES=$(LWIPDIR)/core/ipv6/dhcp6.c $(LWIPDIR)/core/ipv6/ethip6.c \
@@ -116,11 +116,11 @@ APPFILES=$(CONTRIBDIR)/apps/httpserver_raw/fs.c $(CONTRIBDIR)/apps/httpserver_ra
 	$(CONTRIBDIR)/apps/httpserver/httpserver-netconn.c \
 	$(CONTRIBDIR)/apps/udpecho/udpecho.c $(CONTRIBDIR)/apps/tcpecho/tcpecho.c \
 	$(CONTRIBDIR)/apps/shell/shell.c $(CONTRIBDIR)/apps/snmp_private_mib/lwip_prvmib.c \
-	$(CONTRIBDIR)/apps/tcpecho_raw/echo.c $(CONTRIBDIR)/apps/sntp/sntp.c \
+	$(CONTRIBDIR)/apps/tcpecho_raw/echo.c $(LWIPDIR)/apps/sntp/sntp.c \
 	$(CONTRIBDIR)/apps/netio/netio.c $(CONTRIBDIR)/apps/ping/ping.c \
 	$(CONTRIBDIR)/apps/shell/shell.c $(CONTRIBDIR)/apps/smtp/smtp.c \
 	$(CONTRIBDIR)/apps/socket_examples/socket_examples.c \
-	$(CONTRIBDIR)/apps/rtp/rtp.c $(CONTRIBDIR)/apps/netbios/netbios.c
+	$(CONTRIBDIR)/apps/rtp/rtp.c $(LWIPDIR)/apps/netbiosns/netbiosns.c
 
 # LWIPFILES: All the above.
 LWIPFILES=$(COREFILES) $(CORE4FILES) $(CORE6FILES) $(SNMPFILES) $(APIFILES) $(NETIFFILES) $(ARCHFILES)
