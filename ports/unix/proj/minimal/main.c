@@ -52,7 +52,6 @@
 #include "lwip/ip_frag.h"
 #include "lwip/mld6.h"
 #include "lwip/udp.h"
-#include "lwip/snmp_msg.h"
 #include "lwip/tcp.h"
 #include "lwip/dns.h"
 #include "netif/tapif.h"
@@ -63,8 +62,11 @@
 #include "netif/ppp/pppoe.h"
 #include "netif/ppp/pppol2tp.h"
 
-#include "echo.h"
-#include "private_mib.h"
+#include "lwip/apps/snmp.h"
+#include "lwip/apps/snmp_mib2.h"
+
+#include "apps/snmp_private_mib/private_mib.h"
+#include "apps/tcpecho_raw/echo.h"
 
 #include "lwip/tcpip.h"
 
@@ -75,7 +77,12 @@ static ip4_addr_t ipaddr, netmask, gw;
 /* SNMP trap destination cmd option */
 static unsigned char trap_flag;
 static ip_addr_t trap_addr;
-#endif /* LWIP_SNMP */
+
+static const struct snmp_mib *mibs[] = {
+  &mib2,
+  &mib_private
+};
+#endif
 
 /* nonstatic debug cmd option, exported in lwipopts.h */
 unsigned char debug_flags;
@@ -102,12 +109,6 @@ const char *username = "essai", *password = "aon0viipheehooX";
 #endif /* PPP_SUPPORT */
 
 #if LWIP_SNMP
-/* 'non-volatile' SNMP settings
-  @todo: make these truly non-volatile */
-u8_t syscontact_str[255];
-u8_t syscontact_len = 0;
-u8_t syslocation_str[255];
-u8_t syslocation_len = 0;
 /* enable == 1, disable == 2 */
 u8_t snmpauthentraps_set = 2;
 #endif /* LWIP_SNMP */
@@ -146,18 +147,26 @@ static void tcpip_init_done(void *arg)
 {
   sys_sem_t sem = (sys_sem_t)arg;
 
-#if SNMP_PRIVATE_MIB != 0
+#if LWIP_SNMP
   /* initialize our private example MIB */
   lwip_privmib_init();
+
+  /* snmp_trap_dst_ip_set(0,&trap_addr); */
+  /* snmp_trap_dst_enable(0,trap_flag); */
+
+#if SNMP_LWIP_MIB2
+#if SNMP_USE_NETCONN
+  snmp_threadsync_init(&snmp_mib2_lwip_locks, snmp_mib2_lwip_synchronizer);
 #endif
-#if LWIP_SNMP
-  snmp_trap_dst_ip_set(0,&trap_addr);
-  snmp_trap_dst_enable(0,trap_flag);
-  snmp_set_syscontact(syscontact_str,&syscontact_len,sizeof syscontact_str);
-  snmp_set_syslocation(syslocation_str,&syslocation_len,sizeof syslocation_str);
-  snmp_set_snmpenableauthentraps(&snmpauthentraps_set);
+  snmp_mib2_set_syscontact_readonly((const u8_t*)"root", NULL);
+  snmp_mib2_set_syslocation_readonly((const u8_t*)"lwIP development PC", NULL);
+  snmp_mib2_set_sysdescr((const u8_t*)"minimal example", NULL);
+#endif /* SNMP_LWIP_MIB2 */
+
+  /* snmp_set_snmpenableauthentraps(&snmpauthentraps_set); */
+  snmp_set_mibs(mibs, LWIP_ARRAYSIZE(mibs));
   snmp_init();
-#endif
+#endif /* LWIP_SNMP */
 
   echo_init();
 
