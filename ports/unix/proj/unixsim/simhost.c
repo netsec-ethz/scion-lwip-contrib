@@ -66,6 +66,11 @@
 
 #include "netif/tcpdump.h"
 
+#if LWIP_HAVE_SLIPIF
+#include "netif/slipif.h"
+#define SLIP_PTY_TEST 1
+#endif
+
 #if PPP_SUPPORT
 #include "netif/ppp/pppos.h"
 #define PPP_PTY_TEST 1
@@ -166,7 +171,7 @@ sntp_set_system_time(u32_t sec)
   localtime_r(&current_time, &current_time_val);
   
   printf("SNTP time: %02"U32_F".%02"U32_F".%04"U32_F" %02"U32_F":%02"U32_F":%02"U32_F"\n",
-    current_time_val.tm_mday + 1,
+    current_time_val.tm_mday,
     current_time_val.tm_mon  + 1,
     current_time_val.tm_year + 1900,
     current_time_val.tm_hour,
@@ -310,6 +315,12 @@ ping_thread(void *arg)
 
 #endif /* LWIP_SOCKET */
 
+#if LWIP_HAVE_SLIPIF
+/* (manual) host IP configuration */
+static ip_addr_t ipaddr_slip, netmask_slip, gw_slip;
+struct netif slipif;
+#endif /* LWIP_HAVE_SLIPIF */
+
 #if PPP_SUPPORT
 sio_fd_t ppp_sio;
 ppp_pcb *ppp;
@@ -435,7 +446,8 @@ ppp_output_cb(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx)
 static void
 netif_status_callback(struct netif *nif)
 {
-#if LWIP_DHCP
+  printf("NETIF: %c%c%d is %s\n", nif->name[0], nif->name[1], nif->num,
+         netif_is_up(nif) ? "UP" : "DOWN");
 #if LWIP_IPV4
   printf("IPV4: Host at %s ", ip4addr_ntoa(netif_ip4_addr(nif)));
   printf("mask %s ", ip4addr_ntoa(netif_ip4_netmask(nif)));
@@ -444,15 +456,38 @@ netif_status_callback(struct netif *nif)
 #if LWIP_IPV6
   printf("IPV6: Host at %s\n", ip6addr_ntoa(netif_ip6_addr(nif, 0)));
 #endif /* LWIP_IPV6 */
-#else /* LWIP_DHCP */
-  LWIP_UNUSED_ARG(nif);
-#endif /* LWIP_DHCP */
+#if LWIP_NETIF_HOSTNAME
+  printf("FQDN: %s\n", netif_get_hostname(nif));
+#endif /* LWIP_NETIF_HOSTNAME */
 }
 #endif /* LWIP_NETIF_STATUS_CALLBACK */
 
 static void
 init_netifs(void)
 {
+#if LWIP_HAVE_SLIPIF
+#if SLIP_PTY_TEST
+  u8_t siodev_slip = 3;
+#else
+  u8_t siodev_slip = 0;
+#endif
+
+#if LWIP_IPV4
+  netif_add(&slipif, ip_2_ip4(&ipaddr_slip), ip_2_ip4(&netmask_slip), ip_2_ip4(&gw_slip),
+            (void*)&siodev_slip, slipif_init, tcpip_input);
+#else /* LWIP_IPV4 */
+  netif_add(&slipif, (void*)&siodev_slip, slipif_init, tcpip_input);
+#endif /* LWIP_IPV4 */
+#if LWIP_IPV6
+  netif_create_ip6_linklocal_address(&slipif, 1);
+#endif
+#if LWIP_NETIF_STATUS_CALLBACK
+  netif_set_status_callback(&slipif, netif_status_callback);
+#endif /* LWIP_NETIF_STATUS_CALLBACK */
+  netif_set_link_up(&slipif);
+  netif_set_up(&slipif);
+#endif /* LWIP_HAVE_SLIPIF */
+
 #if PPP_SUPPORT
 #if PPP_PTY_TEST
   ppp_sio = sio_open(2);
@@ -471,11 +506,16 @@ init_netifs(void)
       printf("Could not create PPP control interface");
       exit(1);
   }
+
 #ifdef LWIP_PPP_CHAP_TEST
   ppp_set_auth(ppp, PPPAUTHTYPE_CHAP, "lwip", "mysecret");
 #endif
 
   ppp_connect(ppp, 0);
+
+#if LWIP_NETIF_STATUS_CALLBACK
+  netif_set_status_callback(&pppos_netif, netif_status_callback);
+#endif /* LWIP_NETIF_STATUS_CALLBACK */
 #endif /* PPP_SUPPORT */
   
 #if LWIP_IPV4
@@ -491,24 +531,14 @@ init_netifs(void)
 #if LWIP_IPV6
   netif_create_ip6_linklocal_address(&netif, 1);
 #endif
-  netif_set_default(&netif);
-  netif_set_up(&netif);
-
 #if LWIP_NETIF_STATUS_CALLBACK
   netif_set_status_callback(&netif, netif_status_callback);
 #endif /* LWIP_NETIF_STATUS_CALLBACK */
+  netif_set_default(&netif);
+  netif_set_up(&netif);
 
 #if LWIP_DHCP
   dhcp_start(&netif);
-#else /* LWIP_DHCP */
-#if LWIP_IPV4
-  printf("IPV4: Host at %s ", ip4addr_ntoa(netif_ip4_addr(&netif)));
-  printf("mask %s ", ip4addr_ntoa(netif_ip4_netmask(&netif)));
-  printf("gateway %s\n", ip4addr_ntoa(netif_ip4_gw(&netif)));
-#endif /* LWIP_IPV4 */
-#if LWIP_IPV6
-  printf("IPV6: Host at %s\n", ip6addr_ntoa(netif_ip6_addr(&netif, 0)));
-#endif /* LWIP_IPV6 */
 #endif /* LWIP_DHCP */
 
 #if 0
@@ -572,6 +602,11 @@ main(int argc, char **argv)
   IP_ADDR4(&gw,      192,168,  0,1);
   IP_ADDR4(&netmask, 255,255,255,0);
   IP_ADDR4(&ipaddr,  192,168,  0,2);
+#if LWIP_HAVE_SLIPIF
+  IP_ADDR4(&gw_slip,      192,168,  2,  1);
+  IP_ADDR4(&netmask_slip, 255,255,255,255);
+  IP_ADDR4(&ipaddr_slip,  192,168,  2,  2);
+#endif
 #endif /* LWIP_IPV4 */
   
   ping_flag = 0;
