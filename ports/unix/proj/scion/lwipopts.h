@@ -371,7 +371,7 @@
 /**
  * LWIP_HAVE_LOOPIF==1: Support loop interface (127.0.0.1) and loopif.c
  */
-#define LWIP_HAVE_LOOPIF                0
+#define LWIP_HAVE_LOOPIF                1
 
 /*
    ----------------------------------------------
@@ -415,5 +415,12 @@
 
 
 /* Misc */
+// #define LWIP_DEBUG
+#define TCP_DEBUG                       LWIP_DBG_ON
+// #define ETHARP_DEBUG                    LWIP_DBG_ON
+// #define PBUF_DEBUG                      LWIP_DBG_ON
+#define IP_DEBUG                        LWIP_DBG_ON
+#define TCPIP_DEBUG                     LWIP_DBG_ON
+#define UDP_DEBUG                       LWIP_DBG_ON
 
 #endif /* __LWIPOPTS_H__ */
