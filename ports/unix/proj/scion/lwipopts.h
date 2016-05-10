@@ -185,7 +185,7 @@
 /**
  * LWIP_ARP==1: Enable ARP functionality.
  */
-#define LWIP_ARP                        1
+#define LWIP_ARP                        0
 
 /*
    --------------------------------
@@ -419,8 +419,12 @@
 #define TCP_DEBUG                       LWIP_DBG_ON
 // #define ETHARP_DEBUG                    LWIP_DBG_ON
 // #define PBUF_DEBUG                      LWIP_DBG_ON
-#define IP_DEBUG                        LWIP_DBG_ON
+// #define IP_DEBUG                        LWIP_DBG_ON
 #define TCPIP_DEBUG                     LWIP_DBG_ON
 #define UDP_DEBUG                       LWIP_DBG_ON
+#define TCP_INPUT_DEBUG                       LWIP_DBG_ON
+#define TCP_OUTPUT_DEBUG                       LWIP_DBG_ON
+
+#define SCION 1
 
 #endif /* __LWIPOPTS_H__ */

@@ -2,8 +2,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-
-int main(int argc, char *argv[])
+int client()
 {
     int sockfd = 0, n = 0;
     char recvBuff[1024];
@@ -40,5 +39,10 @@ int main(int argc, char *argv[])
     if(n < 0)
         printf("\n Read error \n");
 
-    return 0;
 }
+
+/* int main() */
+/* { */
+/*     client(); */
+/*     return 0; */
+/* } */

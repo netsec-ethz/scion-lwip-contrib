@@ -43,7 +43,7 @@ CFLAGS=-g -Wall -DIPv4 -DLWIP_DEBUG -fPIC
 
 CFLAGS:=$(CFLAGS) \
 	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/ipv4 \
-	-I$(LWIPDIR) -I.
+	-I$(LWIPDIR)/include/scion -I$(LWIPDIR) -I.
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
 COREFILES=$(LWIPDIR)/core/mem.c $(LWIPDIR)/core/memp.c $(LWIPDIR)/core/netif.c \
@@ -55,19 +55,18 @@ CORE4FILES=$(LWIPDIR)/core/ipv4/icmp.c $(LWIPDIR)/core/ipv4/ip.c \
 	$(LWIPDIR)/core/ipv4/inet.c $(LWIPDIR)/core/ipv4/ip_addr.c \
 	$(LWIPDIR)/core/ipv4/inet_chksum.c $(LWIPDIR)/core/ipv4/ip_frag.c
 
+SCIONFILES=$(LWIPDIR)/core/scion/scion.c
 
 # APIFILES: The files which implement the sequential and socket APIs.
 APIFILES=$(LWIPDIR)/api/api_lib.c $(LWIPDIR)/api/api_msg.c $(LWIPDIR)/api/tcpip.c \
 	$(LWIPDIR)/api/err.c $(LWIPDIR)/api/sockets.c $(LWIPDIR)/api/netbuf.c $(LWIPDIR)/api/netdb.c
 
-# NETIFFILES: Files implementing various generic network interface functions.'
-NETIFFILES=$(LWIPDIR)/netif/etharp.c
 
 # ARCHFILES: Architecture specific files.
-ARCHFILES=$(wildcard $(LWIPARCH)/*.c $(LWIPARCH)/netif/tapif.c $(LWIPARCH)/netif/tunif.c $(LWIPARCH)/netif/unixif.c $(LWIPARCH)/netif/list.c $(LWIPARCH)/netif/tcpdump.c)
+ARCHFILES=$(wildcard $(LWIPARCH)/*.c $(LWIPARCH)/netif/unixif.c $(LWIPARCH)/netif/list.c $(LWIPARCH)/netif/tcpdump.c)
 
 # LWIPFILES: All the above.
-LWIPFILES=$(COREFILES) $(CORE4FILES) $(APIFILES) $(NETIFFILES) $(ARCHFILES)
+LWIPFILES=$(COREFILES) $(CORE4FILES) $(SCIONFILES) $(APIFILES) $(ARCHFILES)
 LWIPFILESW=$(wildcard $(LWIPFILES))
 LWIPOBJS=$(notdir $(LWIPFILESW:.c=.o))
 
