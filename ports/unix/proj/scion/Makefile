@@ -39,7 +39,7 @@ LWIPDIR=$(CONTRIBDIR)/../scion-lwip/src
 
 CCDEP=gcc
 CC=gcc
-CFLAGS=-g -Wall -DIPv4 -DLWIP_DEBUG -fPIC
+CFLAGS=-g -Wall -DLWIP_DEBUG -fPIC
 
 CFLAGS:=$(CFLAGS) \
 	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/ipv4 \
