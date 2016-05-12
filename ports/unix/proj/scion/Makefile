@@ -59,7 +59,7 @@ APIFILES=$(LWIPDIR)/api/api_lib.c $(LWIPDIR)/api/api_msg.c $(LWIPDIR)/api/tcpip.
 
 
 # ARCHFILES: Architecture specific files.
-ARCHFILES=$(wildcard $(LWIPARCH)/*.c $(LWIPARCH)/netif/unixif.c $(LWIPARCH)/netif/list.c $(LWIPARCH)/netif/tcpdump.c)
+ARCHFILES=$(LWIPARCH)/sys_arch.c
 
 # LWIPFILES: All the above.
 LWIPFILES=$(COREFILES) $(CORESCIONFILES) $(APIFILES) $(ARCHFILES)
