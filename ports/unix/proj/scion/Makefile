@@ -36,19 +36,21 @@ LWIPARCH=$(CONTRIBDIR)/ports/unix
 #default assumes it's a dir named lwip at the same level as the contrib module
 LWIPDIR=$(CONTRIBDIR)/../scion-lwip/src
 
+SCIONLIB=$(CONTRIBDIR)/../scion/lib
 
 CCDEP=gcc
 CC=gcc
 CFLAGS=-g -Wall -DLWIP_DEBUG -fPIC
 
 CFLAGS:=$(CFLAGS) \
-	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/scion -I$(LWIPDIR) -I.
+	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/scion -I$(LWIPDIR) -I$(SCIONLIB) -I.
 
 COREFILES=$(LWIPDIR)/core/mem.c $(LWIPDIR)/core/memp.c $(LWIPDIR)/core/netif.c \
 	$(LWIPDIR)/core/pbuf.c $(LWIPDIR)/core/stats.c $(LWIPDIR)/core/sys.c \
         $(LWIPDIR)/core/tcp.c $(LWIPDIR)/core/tcp_in.c $(LWIPDIR)/core/raw.c \
         $(LWIPDIR)/core/tcp_out.c $(LWIPDIR)/core/init.c \
         $(LWIPDIR)/core/def.c $(LWIPDIR)/core/timers.c
+
 CORESCIONFILES= $(LWIPDIR)/core/scion/ip.c \
 	$(LWIPDIR)/core/scion/inet.c $(LWIPDIR)/core/scion/ip_addr.c \
 	$(LWIPDIR)/core/scion/inet_chksum.c
@@ -57,9 +59,10 @@ CORESCIONFILES= $(LWIPDIR)/core/scion/ip.c \
 APIFILES=$(LWIPDIR)/api/api_lib.c $(LWIPDIR)/api/api_msg.c $(LWIPDIR)/api/tcpip.c \
 	$(LWIPDIR)/api/err.c $(LWIPDIR)/api/sockets.c $(LWIPDIR)/api/netbuf.c $(LWIPDIR)/api/netdb.c
 
-
 # ARCHFILES: Architecture specific files.
 ARCHFILES=$(LWIPARCH)/sys_arch.c
+
+SCIONLIBFILES=$(SCIONLIB)/
 
 # LWIPFILES: All the above.
 LWIPFILES=$(COREFILES) $(CORESCIONFILES) $(APIFILES) $(ARCHFILES)

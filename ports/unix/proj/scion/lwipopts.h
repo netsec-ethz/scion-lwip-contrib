@@ -422,8 +422,8 @@
 #define IP_DEBUG                        LWIP_DBG_ON
 #define TCPIP_DEBUG                     LWIP_DBG_ON
 #define UDP_DEBUG                       LWIP_DBG_ON
-#define TCP_INPUT_DEBUG                       LWIP_DBG_ON
-#define TCP_OUTPUT_DEBUG                       LWIP_DBG_ON
+#define TCP_INPUT_DEBUG                 LWIP_DBG_ON
+#define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
 
 #define SCION 1
 

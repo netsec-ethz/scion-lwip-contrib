@@ -54,25 +54,12 @@
 
 #include "netif/tapif.h"
 
-struct netif netif;
 
 static void
 tcpip_init_done(void *arg)
 {
-  ip_addr_t ipaddr, netmask, gateway;
   sys_sem_t *sem;
   sem = arg;
-
-  /*
-    CHANGE THESE to suit your own network configuration:
-  */
-  /* IP4_ADDR(&gateway, 192,168,1,1); */
-  /* IP4_ADDR(&ipaddr, 192,168,1,2); */
-  /* IP4_ADDR(&netmask, 255,255,255,0); */
-  /*  */
-  /* netif_set_default(netif_add(&netif, &ipaddr, &netmask, &gateway, NULL, tapif_init, */
-			      /* tcpip_input)); */
-
   sys_sem_signal(sem);
 }
 
