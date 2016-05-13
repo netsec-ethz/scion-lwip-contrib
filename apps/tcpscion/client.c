@@ -1,48 +1,23 @@
-#include "lwip/sockets.h" 
-#include <errno.h>
-#include <stdio.h>
+#include "lwip/sys.h"
+#include "lwip/api.h"
 
 int client()
 {
-    int sockfd = 0, n = 0;
-    char recvBuff[1024];
-    struct sockaddr_in serv_addr; 
-    memset(recvBuff, '0',sizeof(recvBuff));
-    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    struct netconn *conn;
+    ip_addr_t addr;
+    addr.addr = 16777343; // 127.0.0.1
+    conn = netconn_new(NETCONN_TCP);
+    if (netconn_connect(conn, &addr, 5000) == ERR_OK)
     {
-        printf("\n Error : Could not create socket \n");
-        return 1;
-    } 
-
-    memset(&serv_addr, '0', sizeof(serv_addr)); 
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    serv_addr.sin_port = htons(5000); 
-
-
-    int res = connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-    if(res < 0)
-    {
-       printf("\n Error : Connect Failed %d: %s \n", res, strerror(errno));
-       return 1;
-    } 
-
-    while ( (n = read(sockfd, recvBuff, sizeof(recvBuff)-1)) > 0)
-    {
-        recvBuff[n] = 0;
-        if(fputs(recvBuff, stdout) == EOF)
-            printf("\n Error : Fputs error\n");
-    } 
-    printf("\n");
-
-    if(n < 0)
-        printf("\n Read error \n");
-
+          struct netbuf *buf;
+          void *data;
+          u16_t len;
+          if (netconn_recv(conn, &buf) == ERR_OK)
+          {
+               netbuf_data(buf, &data, &len);
+               printf("len:%d:%s\n", len, (char *)data);
+          }
+    }
+    netconn_close(conn);
+    netconn_delete(conn);
 }
-
-/* int main() */
-/* { */
-/*     client(); */
-/*     return 0; */
-/* } */
