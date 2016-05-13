@@ -1,11 +1,15 @@
+#include <stdint.h>
 #include "lwip/sys.h"
 #include "lwip/api.h"
+#include "lwip/ip_addr.h"
+#include "libscion/address.h"
 
 int client()
 {
     struct netconn *conn;
     ip_addr_t addr;
-    addr.addr = 16777343; // 127.0.0.1
+    u8_t def_addr[] = {127, 0, 0, 1}; 
+    scion_addr(&addr, 1, 2, ADDR_IPV4_TYPE, def_addr);
     conn = netconn_new(NETCONN_TCP);
     if (netconn_connect(conn, &addr, 5000) == ERR_OK)
     {
