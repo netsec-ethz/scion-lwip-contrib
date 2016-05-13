@@ -49,8 +49,7 @@ COREFILES=$(LWIPDIR)/core/mem.c $(LWIPDIR)/core/memp.c $(LWIPDIR)/core/pbuf.c $(
 		$(LWIPDIR)/core/tcp.c $(LWIPDIR)/core/tcp_in.c $(LWIPDIR)/core/tcp_out.c $(LWIPDIR)/core/init.c \
         $(LWIPDIR)/core/def.c $(LWIPDIR)/core/timers.c
 
-CORESCIONFILES= $(LWIPDIR)/core/scion/ip.c 	$(LWIPDIR)/core/scion/inet.c \
-				$(LWIPDIR)/core/scion/ip_addr.c $(LWIPDIR)/core/scion/inet_chksum.c
+CORESCIONFILES= $(LWIPDIR)/core/scion/ip.c $(LWIPDIR)/core/scion/inet_chksum.c
 
 # APIFILES: The files which implement the sequential API.
 APIFILES=$(LWIPDIR)/api/api_lib.c $(LWIPDIR)/api/api_msg.c $(LWIPDIR)/api/tcpip.c $(LWIPDIR)/api/netbuf.c
@@ -58,7 +57,7 @@ APIFILES=$(LWIPDIR)/api/api_lib.c $(LWIPDIR)/api/api_msg.c $(LWIPDIR)/api/tcpip.
 # ARCHFILES: Architecture specific files.
 ARCHFILES=$(LWIPARCH)/sys_arch.c
 
-SCIONLIBFILES=$(SCIONLIB)/
+SCIONLIBFILES=$(SCIONLIB)/ #TODO
 
 # LWIPFILES: All the above.
 LWIPFILES=$(COREFILES) $(CORESCIONFILES) $(APIFILES) $(ARCHFILES)
