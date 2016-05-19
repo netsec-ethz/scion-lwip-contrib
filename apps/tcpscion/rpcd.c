@@ -6,8 +6,8 @@
 #include <pthread.h>
 #include "lwip/sys.h"
 #include "lwip/api.h"
-#include "lwip/ip_addr.h"
 #include "libscion/address.h"
+#include "lwip/ip_addr.h"
 
 #define LWIP_SOCK_DIR "/run/shm/lwip/"
 #define RPCD_SOCKET "/run/shm/lwip/lwip"
@@ -50,17 +50,10 @@ void handle_bind(int fd, struct netconn *conn, char *buf, int len){
     char *p = buf;
     p += 4; // skip "BIND"
     port = *((u16_t *)p);
-    fprintf(stderr, "Bound port %d 0 \n", port);
     p += 2; // skip port
-    fprintf(stderr, "Bound port %d 0.5 %p\n", port, &(addr.addr));
-    /* scion_addr_raw(&addr, p[0], p + 1); */
-    // remove the following two lines
-    u8_t def_addr[] = {127, 0, 0, 1}; 
-    scion_addr(&addr, 1, 2, ADDR_IPV4_TYPE, def_addr);
-    //
-    fprintf(stderr, "Bound port %d 1 \n", port);
+    scion_addr_raw(&addr, p[0], p + 1);
+    fprintf(stderr, "Bound port %d, and addr:\n", port);
     print_scion_addr(&addr);
-    fprintf(stderr, "Bound port %d 2 \n", port);
     netconn_bind(conn, &addr, port); // test addr = NULL
     write(fd, "BINDOK", 6);
 }
@@ -72,12 +65,7 @@ void handle_connect(int fd, struct netconn *conn, char *buf, int len){
     p += 4; // skip "BIND"
     port = *((u16_t *)p);
     p += 2; // skip port
-    /* scion_addr_raw(&addr, p[0], p + 1); */
-    // remove the following two lines
-    fprintf(stderr, "Connect to port %d\n", port);
-    u8_t def_addr[] = {127, 0, 0, 1}; 
-    scion_addr(&addr, 1, 2, ADDR_IPV4_TYPE, def_addr);
-    //
+    scion_addr_raw(&addr, p[0], p + 1);
     print_scion_addr(&addr);
     if (netconn_connect(conn, &addr, 5000) == ERR_OK)
         write(fd, "CONNOK", 6);
@@ -205,8 +193,8 @@ void *sock_thread(void *data){
         free(args);
         close(fd);
     }
+    return;
 }
-
 
 int main() {
     struct sockaddr_un addr;
@@ -228,7 +216,6 @@ int main() {
         perror("bind error");
         exit(-1);
     }
-
     if (listen(fd, 5) == -1) {
         perror("listen error");
         exit(-1);
