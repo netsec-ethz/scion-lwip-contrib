@@ -34,7 +34,14 @@ class SCIONSocket(object):
         req = (b"BIND" + struct.pack("H", port) + 
                struct.pack("B", haddr_type) + addr.pack())
         self._to_lwip(req)
-        # "BINDOK", "BINDER"
+        rep = self._from_lwip()
+
+    def connect(self, addr_port):
+        addr, port = addr_port
+        haddr_type = addr.host.TYPE
+        req = (b"CONN" + struct.pack("H", port) + 
+               struct.pack("B", haddr_type) + addr.pack())
+        self._to_lwip(req)
         rep = self._from_lwip()
 
     def create_socket(self):
@@ -45,8 +52,6 @@ class SCIONSocket(object):
         # Register it 
         req = b"NEWS"
         self._to_lwip(req)
-        # send to lw: "NEWS"
-        # receive: "NEWSOK" or "NEWSER"
         rep = self._from_lwip()
 
     def _to_lwip(self, req):
