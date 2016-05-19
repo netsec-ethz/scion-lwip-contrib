@@ -68,12 +68,11 @@ class SCIONSocket(object):
         # pass it in new?
         req = b"ACCE" + self.lwip_accept.getsockname()[-36:].encode('ascii')
         self._to_lwip(req)
-        # new_sock, _ = self.lwip_accept.accept()
-        rep = self._from_lwip()
-# 
-#         sock = SCIONSocket(self.family, self.type_, self.proto)
-#         addr = sock.new_accept()
-        # read from accept socket()
+        new_sock, _ = self.lwip_accept.accept()
+        print("From accept socket: ", new_sock.recv(self.BUFLEN))
+        sock = SCIONSocket(self.family, self.type_, self.proto)
+        sock.lwip_sock = new_sock 
+        return sock, None # addr 
 
     def _init_accept_sock(self):
         if self.lwip_accept:
@@ -85,9 +84,24 @@ class SCIONSocket(object):
         self.lwip_accept = stdsock.socket(stdsock.AF_UNIX, stdsock.SOCK_STREAM)
         self.lwip_accept.bind(fname)
 
-    def new_accept(self): #it creates new 
-        assert self.lwip_sock is None
-        return None # should be SCIONAddr here
+    def send(self, msg):
+        req = b"SEND" + msg
+        self._to_lwip(req)
+        rep = self._from_lwip
+
+    def recv(self, bufsize):
+        req = b"REVC"  # + bufsize, ignored for now
+        self._to_lwip(req)
+        rep = self._from_lwip
+        return rep[6:]
+
+    def close(self):
+        req = b"CLOS"
+        self._to_lwip(req)
+        rep = self._from_lwip # not needed probably
+        self.lwip_sock.close()
+        if self.lwip_accept: 
+            self.lwip_accept.close()
 
 
 def socket(family, type_, proto=0):
@@ -99,4 +113,5 @@ s = socket(AF_SCION, SOCK_STREAM)
 addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
 s.bind((addr, 5000))
 s.listen()
-s.accept()
+# new_sock, addr = s.accept()
+s.close()
