@@ -128,20 +128,22 @@ def server():
     addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
     s.bind((addr, 5000))
     s.listen()
-    # s.recv()
-    new_sock, addr = s.accept()
-    new_sock.send(b"test")
-    new_sock.close()
+    while True:
+        new_sock, addr = s.accept()
+        new_sock.send(b" TEST_FROM_APP")
+        new_sock.close()
 
 def client():
     print("client running")
-    s = socket(AF_SCION, SOCK_STREAM, name='CLIENT')
+    s = socket(AF_SCION, SOCK_STREAM, name='CLIENT%d' % int(time.time()) )
     addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
     s.connect((addr, 5000))
     s.recv(1024)
     s.close()
 
 threading.Thread(target=server).start()
-input()
-threading.Thread(target=client).start()
+while True:
+    input()
+    print("\n\n")
+    threading.Thread(target=client).start()
 

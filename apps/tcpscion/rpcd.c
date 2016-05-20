@@ -11,7 +11,9 @@
 
 #define LWIP_SOCK_DIR "/run/shm/lwip/"
 #define RPCD_SOCKET "/run/shm/lwip/lwip"
-#define PATH_LEN 36  // of "accept" socket
+#define SOCK_PATH_LEN 36  // of "accept" socket
+#define CMD_SIZE 4
+#define BUFLEN 1024
 
 struct conn_args{
     int fd;
@@ -28,11 +30,11 @@ void handle_new_sock(int fd){
     struct conn_args *args = malloc(sizeof *args);
     pthread_t tid;
     printf("NEWS received\n");
-    if (read(fd, buf, sizeof(buf)) != 4){
+    if (read(fd, buf, sizeof(buf)) != CMD_SIZE){
         perror("new_sock() error on read\n");
         return;
     }
-    if (strncmp(buf, "NEWS", 4)){
+    if (strncmp(buf, "NEWS", CMD_SIZE)){
         perror("new_sock() wrong command\n");
         return;
     }
@@ -42,61 +44,62 @@ void handle_new_sock(int fd){
     pthread_create(&tid, NULL, &sock_thread, args);
 }
 
-void handle_bind(int fd, struct netconn *conn, char *buf, int len){
+void handle_bind(struct conn_args *args, char *buf, int len){
     // check len > 12 < 24 ?
     // encode none address
     ip_addr_t addr;
     int port; 
     char *p = buf;
-    p += 4; // skip "BIND"
+    p += CMD_SIZE; // skip "BIND"
     port = *((u16_t *)p);
     p += 2; // skip port
     scion_addr_raw(&addr, p[0], p + 1);
     fprintf(stderr, "Bound port %d, and addr:\n", port);
     print_scion_addr(&addr);
-    netconn_bind(conn, &addr, port); // test addr = NULL
-    write(fd, "BINDOK", 6);
+    netconn_bind(args->conn, &addr, port); // test addr = NULL
+    write(args->fd, "BINDOK", 6);
 }
 
-void handle_connect(int fd, struct netconn *conn, char *buf, int len){
+void handle_connect(struct conn_args *args, char *buf, int len){
     ip_addr_t addr;
     int port; 
     char *p = buf;
-    p += 4; // skip "BIND"
+    p += CMD_SIZE; // skip "BIND"
     port = *((u16_t *)p);
     p += 2; // skip port
     scion_addr_raw(&addr, p[0], p + 1);
     print_scion_addr(&addr);
-    if (netconn_connect(conn, &addr, port) == ERR_OK)
-        write(fd, "CONNOK", 6);
+    if (netconn_connect(args->conn, &addr, port) == ERR_OK)
+        write(args->fd, "CONNOK", 6);
     else
-        write(fd, "CONNER", 6);
+        write(args->fd, "CONNER", 6);
 }
 
-void handle_listen(int fd, struct netconn *conn){
-    netconn_listen(conn);
+void handle_listen(struct conn_args *args){
+    netconn_listen(args->conn);
     printf("LIST received, returning OK\n");
-    write(fd, "LISTOK", 6);
+    write(args->fd, "LISTOK", 6);
 }
 
-void handle_accept(int fd, struct netconn *conn, char *buf, int len){
-    char accept_path[strlen(LWIP_SOCK_DIR) + PATH_LEN];
+void handle_accept(struct conn_args *args, char *buf, int len){
+    char accept_path[strlen(LWIP_SOCK_DIR) + SOCK_PATH_LEN];
     struct netconn *newconn;
     struct sockaddr_un addr;
     int new_fd;
     fprintf(stderr, "handle_accept()\n");
-    if (len != 4 + PATH_LEN){
+    if (len != CMD_SIZE + SOCK_PATH_LEN){
         perror("Incorrect ACCE length\n");
-        write(fd, "ACCEER", 6);
+        write(args->fd, "ACCEER", 6);
     }
 
     fprintf(stderr, "handle_accept(): waiting...\n");
-    netconn_accept(conn, &newconn);
+    netconn_accept(args->conn, &newconn);
 
-    strncpy(accept_path, LWIP_SOCK_DIR, strlen(LWIP_SOCK_DIR));
-    strncat(accept_path, buf + 4 , PATH_LEN);
+    /* strncpy(accept_path, LWIP_SOCK_DIR, strlen(LWIP_SOCK_DIR)); */
+    /* strncat(accept_path, buf + CMD_SIZE , SOCK_PATH_LEN); */
+    sprintf(accept_path, "%s%.*s", LWIP_SOCK_DIR, SOCK_PATH_LEN, buf + CMD_SIZE);
+    /* accept_path[strlen(LWIP_SOCK_DIR) + SOCK_PATH_LEN] = '\x00'; */
     fprintf(stderr, "Will connect to %s\n", accept_path);
-        //remove:
     if ( (new_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
       perror("socket error");
       exit(-1);
@@ -105,79 +108,81 @@ void handle_accept(int fd, struct netconn *conn, char *buf, int len){
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, accept_path, sizeof(addr.sun_path)-1);
     if (connect(new_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        perror("connect error"); 
+        fprintf(stderr, "trying connect to %s\n", accept_path);
+        perror("connect error0"); 
         exit(-1);
     }
 
     // start thread with new_fd and newconn
-    struct conn_args *args = malloc(sizeof *args);
+    struct conn_args *new_args = malloc(sizeof *new_args);
     pthread_t tid;
-    args->fd = new_fd;
-    args->conn = newconn;
-    pthread_create(&tid, NULL, &sock_thread, args);
+    new_args->fd = new_fd;
+    new_args->conn = newconn;
+    pthread_create(&tid, NULL, &sock_thread, new_args);
     // let know that new thread is ready
     write(new_fd, "ACCEOK", 6); // TODO: return addr here
 }
 
-void handle_send(int fd, struct netconn *conn, char *buf, int len){
+void handle_send(struct conn_args *args, char *buf, int len){
     //PSz: discuss how to implement it long term, lib probably has to pass len
-    fprintf(stderr, "netconn_write(%d): %s", len-4, buf+4);
-    netconn_write(conn, buf+4, len-4, NETCONN_COPY); // try with NOCOPY
-    write(fd, "SENDOK", 6);
+    fprintf(stderr, "netconn_write(%d): %s", len-CMD_SIZE, buf+CMD_SIZE);
+    netconn_write(args->conn, buf+CMD_SIZE, len-CMD_SIZE, NETCONN_COPY); // try with NOCOPY
+    write(args->fd, "SENDOK", 6);
 }
 
-void handle_recv(int fd, struct netconn *conn){
+void handle_recv(struct conn_args *args){
     struct netbuf *buf;
     void *data;
     u16_t len;
-    if (netconn_recv(conn, &buf) == ERR_OK){
+    if (netconn_recv(args->conn, &buf) == ERR_OK){
         netbuf_data(buf, &data, &len);
         // put two write()s instead RECVOK should be followed by len
-        char msg[len + 6];
+        char *msg = malloc(len + 6);
         memcpy(msg, "RECVOK", 6);
         memcpy(msg + 6, data, len);
-        write(fd, msg, len + 6);
+        write(args->fd, msg, len + 6);
+        free(msg);
     }
     else
-        write(fd, "RECVER", 6);
+        write(args->fd, "RECVER", 6);
 }
 
 void handle_close(struct conn_args *args){
-    // TODO: check code below
+    // TODO: check this:
     /* close(args->fd); */
     netconn_close(args->conn);
     netconn_delete(args->conn);
     free(args);
     //smth missing?
-    pthread_exit(0);
 }
 
 void *sock_thread(void *data){
     struct conn_args *args = data;
-    int rc, fd = args->fd;
-    struct netconn *conn = args->conn;
-    char buf[1024];
+    int rc;
+    char buf[BUFLEN];
     fprintf(stderr, "started, waiting for requests\n");
-    while ((rc=read(fd, buf, sizeof(buf))) > 0) {
-        printf("read %u bytes from %d: %.*s\n", rc, fd, rc, buf);
-        if (rc < 4){
+    while ((rc=read(args->fd, buf, sizeof(buf))) > 0) {
+        printf("read %u bytes from %d: %.*s\n", rc, args->fd, rc, buf);
+        if (rc < CMD_SIZE){
             perror("command too short\n");
             continue;
         }
-        if (!strncmp(buf, "SEND", 4))
-            handle_send(fd, conn, buf, rc);
-        else if (!strncmp(buf, "RECV", 4))
-            handle_recv(fd, conn);
-        else if (!strncmp(buf, "BIND", 4))
-            handle_bind(fd, conn, buf, rc);
-        else if (!strncmp(buf, "CONN", 4))
-            handle_connect(fd, conn, buf, rc);
-        else if (!strncmp(buf, "LIST", 4))
-            handle_listen(fd, conn);
-        else if (!strncmp(buf, "ACCE", 4))
-            handle_accept(fd, conn, buf, rc);
-        else if (!strncmp(buf, "CLOS", 4))
+        if (!strncmp(buf, "SEND", CMD_SIZE))
+            handle_send(args, buf, rc);
+        else if (!strncmp(buf, "RECV", CMD_SIZE))
+            handle_recv(args);
+        else if (!strncmp(buf, "BIND", CMD_SIZE))
+            handle_bind(args, buf, rc);
+        else if (!strncmp(buf, "CONN", CMD_SIZE))
+            handle_connect(args, buf, rc);
+        else if (!strncmp(buf, "LIST", CMD_SIZE))
+            handle_listen(args);
+        else if (!strncmp(buf, "ACCE", CMD_SIZE))
+            handle_accept(args, buf, rc);
+        else if (!strncmp(buf, "CLOS", CMD_SIZE)){
             handle_close(args);
+            break;
+        }
     }
     if (rc == -1) {
         // clean here
@@ -188,8 +193,8 @@ void *sock_thread(void *data){
     else if (rc == 0) {
         printf("EOF\n");
         // clean here
+        close(args->fd);
         handle_close(args);
-        close(fd);
     }
     return;
 }
