@@ -67,7 +67,7 @@ void handle_connect(int fd, struct netconn *conn, char *buf, int len){
     p += 2; // skip port
     scion_addr_raw(&addr, p[0], p + 1);
     print_scion_addr(&addr);
-    if (netconn_connect(conn, &addr, 5000) == ERR_OK)
+    if (netconn_connect(conn, &addr, port) == ERR_OK)
         write(fd, "CONNOK", 6);
     else
         write(fd, "CONNER", 6);
@@ -121,6 +121,7 @@ void handle_accept(int fd, struct netconn *conn, char *buf, int len){
 
 void handle_send(int fd, struct netconn *conn, char *buf, int len){
     //PSz: discuss how to implement it long term, lib probably has to pass len
+    fprintf(stderr, "netconn_write(%d): %s", len-4, buf+4);
     netconn_write(conn, buf+4, len-4, NETCONN_COPY); // try with NOCOPY
     write(fd, "SENDOK", 6);
 }
@@ -134,7 +135,7 @@ void handle_recv(int fd, struct netconn *conn){
         // put two write()s instead RECVOK should be followed by len
         char msg[len + 6];
         memcpy(msg, "RECVOK", 6);
-        memcpy(msg, buf, len);
+        memcpy(msg + 6, data, len);
         write(fd, msg, len + 6);
     }
     else
@@ -142,9 +143,7 @@ void handle_recv(int fd, struct netconn *conn){
 }
 
 void handle_close(struct conn_args *args){
-    pthread_exit(0);
     // TODO: check code below
-    /* write(args->fd, "CLOSOK", 6); */
     /* close(args->fd); */
     netconn_close(args->conn);
     netconn_delete(args->conn);
@@ -190,7 +189,6 @@ void *sock_thread(void *data){
         printf("EOF\n");
         // clean here
         handle_close(args);
-        free(args);
         close(fd);
     }
     return;

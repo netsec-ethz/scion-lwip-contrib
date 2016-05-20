@@ -18,7 +18,7 @@ class SCIONSocket(object):
     BUFLEN = 1024
     
 
-    def __init__(self, family, type_, proto=0):
+    def __init__(self, family, type_, proto=0, name=''):
         assert family == AF_SCION
         assert type_ == SOCK_STREAM
         assert proto == 0 
@@ -27,6 +27,7 @@ class SCIONSocket(object):
         self.proto = proto
         self.lwip_sock = None
         self.lwip_accept = None
+        self.name = name # debug only
 
     def bind(self, addr_port):
         addr, port = addr_port
@@ -55,12 +56,14 @@ class SCIONSocket(object):
         rep = self._from_lwip()
 
     def _to_lwip(self, req):
-        print("Sending to LWIP:", req)
+        print(self.name, "Sending to LWIP:", req)
         self.lwip_sock.send(req)
 
-    def _from_lwip(self):
-        rep = self.lwip_sock.recv(self.BUFLEN)  # read in a loop
-        print("Reading from LWIP:", rep)
+    def _from_lwip(self, buflen=None):
+        if buflen is None:
+            buflen=self.BUFLEN
+        rep = self.lwip_sock.recv(buflen)  # read in a loop
+        print(self.name, "Reading from LWIP:", rep)
 
     def listen(self): # w/o backlog for now, let's use LWIP's default
         req = b"LIST"
@@ -74,8 +77,8 @@ class SCIONSocket(object):
         req = b"ACCE" + self.lwip_accept.getsockname()[-36:].encode('ascii')
         self._to_lwip(req)
         new_sock, _ = self.lwip_accept.accept()
-        print("From accept socket: ", new_sock.recv(self.BUFLEN))
-        sock = SCIONSocket(self.family, self.type_, self.proto)
+        print(self.name, "From accept socket: ", new_sock.recv(self.BUFLEN))
+        sock = SCIONSocket(self.family, self.type_, self.proto, name="NEW_ACC")
         sock.lwip_sock = new_sock 
         return sock, None # addr 
 
@@ -85,38 +88,60 @@ class SCIONSocket(object):
         fname = "%s%s" % (LWIP_SOCK_DIR, uuid.uuid4())
         while os.path.exists(fname):
             fname = "%s%s" % (LWIP_SOCK_DIR, uuid.uuid4())
-        print("_init_accept:", fname)
+        print(self.name, "_init_accept:", fname)
         self.lwip_accept = stdsock.socket(stdsock.AF_UNIX, stdsock.SOCK_STREAM)
         self.lwip_accept.bind(fname)
 
     def send(self, msg):
         req = b"SEND" + msg
         self._to_lwip(req)
-        rep = self._from_lwip
+        rep = self._from_lwip()
 
     def recv(self, bufsize):
-        req = b"REVC"  # + bufsize, ignored for now
+        req = b"RECV"  # + bufsize, ignored for now
         self._to_lwip(req)
-        rep = self._from_lwip
+        rep = self._from_lwip()
+        if rep is None or len(rep) < 6:
+            return b''
         return rep[6:]
 
     def close(self):
         req = b"CLOS"
         self._to_lwip(req)
-        rep = self._from_lwip # not needed probably
         self.lwip_sock.close()
         if self.lwip_accept: 
             self.lwip_accept.close()
 
 
-def socket(family, type_, proto=0):
-    sock = SCIONSocket(family, type_, proto)
+def socket(family, type_, proto=0, name=''):
+    sock = SCIONSocket(family, type_, proto, name)
     sock.create_socket()
     return sock
 
-s = socket(AF_SCION, SOCK_STREAM)
-addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
-s.bind((addr, 5000))
-s.listen()
-# new_sock, addr = s.accept()
-s.close()
+
+# Test
+import threading
+import time
+def server():
+    print("server running")
+    s = socket(AF_SCION, SOCK_STREAM, name='SERVER')
+    addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
+    s.bind((addr, 5000))
+    s.listen()
+    # s.recv()
+    new_sock, addr = s.accept()
+    new_sock.send(b"test")
+    new_sock.close()
+
+def client():
+    print("client running")
+    s = socket(AF_SCION, SOCK_STREAM, name='CLIENT')
+    addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
+    s.connect((addr, 5000))
+    s.recv(1024)
+    s.close()
+
+threading.Thread(target=server).start()
+input()
+threading.Thread(target=client).start()
+
