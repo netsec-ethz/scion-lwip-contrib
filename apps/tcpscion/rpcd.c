@@ -149,7 +149,7 @@ void handle_recv(struct conn_args *args){
 
 void handle_close(struct conn_args *args){
     // TODO: check this:
-    /* close(args->fd); */
+    close(args->fd);
     netconn_close(args->conn);
     netconn_delete(args->conn);
     free(args);
