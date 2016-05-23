@@ -13,6 +13,7 @@
 #define RPCD_SOCKET "/run/shm/lwip/lwip"
 #define SOCK_PATH_LEN 36  // of "accept" socket
 #define CMD_SIZE 4
+#define RESP_SIZE (CMD_SIZE + 2)
 #define BUFLEN 1024
 
 struct conn_args{
@@ -26,59 +27,86 @@ void get_default_addr(){
 
 void *sock_thread(void *data);
 void handle_new_sock(int fd){
-    char buf[5];
-    struct conn_args *args = malloc(sizeof *args);
+    char buf[8];
+    struct conn_args *args;
+    struct netconn *conn;
     pthread_t tid;
     printf("NEWS received\n");
     if (read(fd, buf, sizeof(buf)) != CMD_SIZE){
-        perror("new_sock() error on read\n");
+        write(fd, "NEWSER", RESP_SIZE);
+        perror("handle_new_sock() error on read\n");
         return;
     }
     if (strncmp(buf, "NEWS", CMD_SIZE)){
-        perror("new_sock() wrong command\n");
+        write(fd, "NEWSER", RESP_SIZE);
+        perror("handle_new_sock() wrong command\n");
         return;
     }
+    conn = netconn_new(NETCONN_TCP);
+    if (conn == NULL){
+        write(fd, "NEWSER", RESP_SIZE);
+        perror("handle_new_sock() failed at netconn_new()\n");
+        return;
+    }
+    args = malloc(sizeof *args);
     args->fd = fd;
-    args->conn = netconn_new(NETCONN_TCP);
-    write(fd, "NEWSOK", 6);
+    args->conn = conn;
+    write(fd, "NEWSOK", RESP_SIZE);
     pthread_create(&tid, NULL, &sock_thread, args);
 }
 
 void handle_bind(struct conn_args *args, char *buf, int len){
-    // check len > 12 < 24 ?
-    // encode none address
     ip_addr_t addr;
-    int port; 
+    u16_t port;
     char *p = buf;
+    printf("BIND received\n");
+    if ((len < CMD_SIZE + 3 + ADDR_NONE_LEN) || (len > CMD_SIZE + 3 + ADDR_IPV6_LEN)){
+        write(args->fd, "BINDER", RESP_SIZE);
+        perror("handle_bind() error on read\n");
+        return;
+    } // TODO(PSz): add more tests
+
     p += CMD_SIZE; // skip "BIND"
     port = *((u16_t *)p);
     p += 2; // skip port
     scion_addr_raw(&addr, p[0], p + 1);
-    fprintf(stderr, "Bound port %d, and addr:\n", port);
+    // TODO(PSz): test bind with addr = NULL
+    if (netconn_bind(args->conn, &addr, port) != ERR_OK){
+        write(args->fd, "BINDER", RESP_SIZE);
+        perror("handle_bind() error at netconn_bind()\n");
+        return;
+    }
+    fprintf(stderr, "Bound port %d and addr:", port);
     print_scion_addr(&addr);
-    netconn_bind(args->conn, &addr, port); // test addr = NULL
-    write(args->fd, "BINDOK", 6);
+    write(args->fd, "BINDOK", RESP_SIZE);
 }
 
 void handle_connect(struct conn_args *args, char *buf, int len){
     ip_addr_t addr;
-    int port; 
+    int port;
     char *p = buf;
+    printf("CONN received\n");
     p += CMD_SIZE; // skip "BIND"
     port = *((u16_t *)p);
     p += 2; // skip port
     scion_addr_raw(&addr, p[0], p + 1);
     print_scion_addr(&addr);
-    if (netconn_connect(args->conn, &addr, port) == ERR_OK)
-        write(args->fd, "CONNOK", 6);
-    else
-        write(args->fd, "CONNER", 6);
+    if (netconn_connect(args->conn, &addr, port) != ERR_OK){
+        write(args->fd, "CONNER", RESP_SIZE);
+        perror("handle_bind() error at netconn_connect()\n");
+        return;
+    }
+    write(args->fd, "CONNOK", RESP_SIZE);
 }
 
 void handle_listen(struct conn_args *args){
-    netconn_listen(args->conn);
-    printf("LIST received, returning OK\n");
-    write(args->fd, "LISTOK", 6);
+    printf("LIST received\n");
+    if (netconn_listen(args->conn) != ERR_OK){
+        write(args->fd, "LISTER", RESP_SIZE);
+        perror("handle_bind() error at netconn_listen()\n");
+        return;
+    }
+    write(args->fd, "LISTOK", RESP_SIZE);
 }
 
 void handle_accept(struct conn_args *args, char *buf, int len){
@@ -86,31 +114,35 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     struct netconn *newconn;
     struct sockaddr_un addr;
     int new_fd;
-    fprintf(stderr, "handle_accept()\n");
+    printf("ACCE received\n");
     if (len != CMD_SIZE + SOCK_PATH_LEN){
-        perror("Incorrect ACCE length\n");
-        write(args->fd, "ACCEER", 6);
+        perror("handle_accept(): incorrect ACCE length\n");
+        write(args->fd, "ACCEER", RESP_SIZE);
+        return;
     }
 
+    if (netconn_accept(args->conn, &newconn) != ERR_OK){
+        perror("handle_accept() error at netconn_accept()\n");
+        write(args->fd, "ACCEER", RESP_SIZE);
+        return;
+    }
     fprintf(stderr, "handle_accept(): waiting...\n");
-    netconn_accept(args->conn, &newconn);
 
-    /* strncpy(accept_path, LWIP_SOCK_DIR, strlen(LWIP_SOCK_DIR)); */
-    /* strncat(accept_path, buf + CMD_SIZE , SOCK_PATH_LEN); */
     sprintf(accept_path, "%s%.*s", LWIP_SOCK_DIR, SOCK_PATH_LEN, buf + CMD_SIZE);
-    /* accept_path[strlen(LWIP_SOCK_DIR) + SOCK_PATH_LEN] = '\x00'; */
     fprintf(stderr, "Will connect to %s\n", accept_path);
-    if ( (new_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-      perror("socket error");
-      exit(-1);
+    if ((new_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("handle_accept() error at socket()\n");
+        write(args->fd, "ACCEER", RESP_SIZE);
+        return;
     }
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, accept_path, sizeof(addr.sun_path)-1);
     if (connect(new_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        fprintf(stderr, "trying connect to %s\n", accept_path);
-        perror("connect error0"); 
-        exit(-1);
+        perror("handle_accept() error at connect()\n");
+        fprintf(stderr, "failed connection to %s\n", accept_path);
+        write(args->fd, "ACCEER", RESP_SIZE);
+        return;
     }
 
     // start thread with new_fd and newconn
@@ -118,37 +150,91 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     pthread_t tid;
     new_args->fd = new_fd;
     new_args->conn = newconn;
-    pthread_create(&tid, NULL, &sock_thread, new_args);
-    // let know that new thread is ready
-    write(new_fd, "ACCEOK", 6); // TODO: return addr here
+    if (pthread_create(&tid, NULL, &sock_thread, new_args)){
+        perror("handle_accept() error at pthread_create()\n");
+        free(new_args);
+        write(args->fd, "ACCEER", RESP_SIZE);
+        return;
+    }
+    // Letting know that new thread is ready.
+    write(args->fd, "ACCEOK", RESP_SIZE);
+    write(new_fd, "ACCEOK", RESP_SIZE); // TODO: return addr + path? here
 }
 
 void handle_send(struct conn_args *args, char *buf, int len){
-    //PSz: discuss how to implement it long term, lib probably has to pass len
-    fprintf(stderr, "netconn_write(%d): %s", len-CMD_SIZE, buf+CMD_SIZE);
-    netconn_write(args->conn, buf+CMD_SIZE, len-CMD_SIZE, NETCONN_COPY); // try with NOCOPY
-    write(args->fd, "SENDOK", 6);
+    char *p = buf;
+    u32_t size;
+    size_t written;
+
+    p += CMD_SIZE; // skip "SEND"
+    len -= CMD_SIZE;
+    size = *((u32_t *)p);
+    p += 4; // skip total size
+    len -= 4; // how many bytes local read() has read.
+    printf("SEND received (%d bytes to send, locally received: %d)\n", size, len);
+
+    // This is implemented more like send_all(). If this is not desired, we
+    // could allocate temporary buf or sync buf size with python's send().
+    while (1){
+        if (len > size){
+            perror("handle_send() error: received more than to send\n");
+            write(args->fd, "SENDER", RESP_SIZE);
+            return;
+        }
+        // TODO(PSz) copying is probably unnecessary, try with NOCOPY
+        if (netconn_write_partly(args->conn, p, len, NETCONN_COPY, &written) != ERR_OK){
+            perror("handle_send() error at netconn_write()\n");
+            printf("NETCONN PARTLY BROKEN: %d, %d, %d\n", len, written, size);
+            write(args->fd, "SENDER", RESP_SIZE);
+            return;
+        }
+        printf("NETCONN PARTLY OK: %d, %d, %d\n", len, written, size);
+        size -= written;
+        len -= written;
+        if (!size) // done
+            break;
+        if (len > 0){ // write again from current buf
+            p += written;
+            continue;
+        }
+        // read new part from app
+        len=read(args->fd, buf, BUFLEN);
+        if (len < 1){
+            perror("handle_send() error at local sock read()\n");
+            write(args->fd, "SENDER", RESP_SIZE);
+            return;
+        }
+        p = buf;
+    }
+    write(args->fd, "SENDOK", RESP_SIZE);
 }
 
 void handle_recv(struct conn_args *args){
     struct netbuf *buf;
     void *data;
     u16_t len;
-    if (netconn_recv(args->conn, &buf) == ERR_OK){
-        netbuf_data(buf, &data, &len);
-        // put two write()s instead RECVOK should be followed by len
-        char *msg = malloc(len + 6);
-        memcpy(msg, "RECVOK", 6);
-        memcpy(msg + 6, data, len);
-        write(args->fd, msg, len + 6);
-        free(msg);
+
+    if (netconn_recv(args->conn, &buf) != ERR_OK){
+        perror("handle_recv() error at netconn_recv()\n");
+        write(args->fd, "RECVER", RESP_SIZE);
+        return;
     }
-    else
-        write(args->fd, "RECVER", 6);
+
+    if (netbuf_data(buf, &data, &len) != ERR_OK){
+        perror("handle_recv() error at netbuf_data()\n");
+        write(args->fd, "RECVER", RESP_SIZE);
+        return;
+    }
+
+    char *msg = malloc(len + RESP_SIZE + 2);
+    memcpy(msg, "RECVOK", RESP_SIZE);
+    *((u16_t *)(msg + RESP_SIZE)) = len;  // encode len
+    memcpy(msg + RESP_SIZE + 2, data, len);
+    write(args->fd, msg, len + RESP_SIZE + 2);  // err handling
+    free(msg);
 }
 
 void handle_close(struct conn_args *args){
-    // TODO: check this:
     close(args->fd);
     netconn_close(args->conn);
     netconn_delete(args->conn);
@@ -193,7 +279,6 @@ void *sock_thread(void *data){
     else if (rc == 0) {
         printf("EOF\n");
         // clean here
-        close(args->fd);
         handle_close(args);
     }
     return;
