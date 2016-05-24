@@ -15,6 +15,7 @@ SOCK_STREAM = 1  # ditto
 MAX_MSG_LEN = 2**32  # u32_t is used as size_t at rpcd
 CMD_SIZE = 4
 RESP_SIZE = CMD_SIZE + 2  # either "OK" or "ER" is appended
+NO_SVC = 0xff  # No service associated with the socket
 
 class error(stdsock.error):
     pass
@@ -36,11 +37,10 @@ class SCIONSocket(object):
         self.recv_buf = b''
         self.name = name # debug only
 
-    def bind(self, addr_port):
+    def bind(self, addr_port, svc=NO_SVC):
         addr, port = addr_port
         haddr_type = addr.host.TYPE
-        req = (b"BIND" + struct.pack("H", port) +
-               struct.pack("B", haddr_type) + addr.pack())
+        req = b"BIND" + struct.pack("HBB", port, svc, haddr_type) + addr.pack()
         self._to_lwip(req)
         rep = self._from_lwip()
         if rep != b"BINDOK":
@@ -173,7 +173,7 @@ def socket(family, type_, proto=0, name=''):
 # Test
 import threading
 import time
-MSG_SIZE = 10000
+MSG_SIZE = 8000
 MSG = b"A"*MSG_SIZE
 def server():
     print("server running")
