@@ -72,7 +72,7 @@ void handle_bind(struct conn_args *args, char *buf, int len){
     p += 2; // skip port
     svc = p[0]; // SVC Address
     p++; // skip svc
-    args->conn->pcb.ip->svc = svc;
+    args->conn->pcb.ip->svc = svc; // set svc for TCP/IP context
     scion_addr_raw(&addr, p[0], p + 1);
     // TODO(PSz): test bind with addr = NULL
     if (netconn_bind(args->conn, &addr, port) != ERR_OK){
@@ -86,13 +86,25 @@ void handle_bind(struct conn_args *args, char *buf, int len){
 }
 
 void handle_connect(struct conn_args *args, char *buf, int len){
+    // Some sanity checks with len etc...
     ip_addr_t addr;
-    int port;
+    u16_t port, path_len;
     char *p = buf;
     printf("CONN received\n");
     p += CMD_SIZE; // skip "BIND"
     port = *((u16_t *)p);
     p += 2; // skip port
+    path_len = *((u16_t *)p);
+    p += 2; // skip path_len
+
+    // add path to TCP/IP state
+    spath_t *spath = malloc(sizeof *spath);
+    spath->path = malloc(path_len);
+    spath->len = path_len;
+    args->conn->pcb.ip->path = spath;
+    fprintf(stderr, "Path added, len %d\n", path_len);
+
+    p += path_len; // skip path
     scion_addr_raw(&addr, p[0], p + 1);
     print_scion_addr(&addr);
     if (netconn_connect(args->conn, &addr, port) != ERR_OK){
@@ -240,6 +252,10 @@ void handle_recv(struct conn_args *args){
 
 void handle_close(struct conn_args *args){
     close(args->fd);
+    if (args->conn->pcb.ip->path != NULL){
+        free(args->conn->pcb.ip->path->path);
+        free(args->conn->pcb.ip->path);
+    }
     netconn_close(args->conn);
     netconn_delete(args->conn);
     free(args);
