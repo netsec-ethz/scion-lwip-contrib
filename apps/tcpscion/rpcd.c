@@ -100,6 +100,7 @@ void handle_connect(struct conn_args *args, char *buf, int len){
     // add path to TCP/IP state
     spath_t *spath = malloc(sizeof *spath);
     spath->path = malloc(path_len);
+    memcpy(spath->path, p, path_len);
     spath->len = path_len;
     args->conn->pcb.ip->path = spath;
     fprintf(stderr, "Path added, len %d\n", path_len);
@@ -109,7 +110,7 @@ void handle_connect(struct conn_args *args, char *buf, int len){
     print_scion_addr(&addr);
     if (netconn_connect(args->conn, &addr, port) != ERR_OK){
         write(args->fd, "CONNER", RESP_SIZE);
-        perror("handle_bind() error at netconn_connect()\n");
+        perror("handle_connect() error at netconn_connect()\n");
         return;
     }
     write(args->fd, "CONNOK", RESP_SIZE);
@@ -252,13 +253,14 @@ void handle_recv(struct conn_args *args){
 
 void handle_close(struct conn_args *args){
     close(args->fd);
-    if (args->conn->pcb.ip->path != NULL){
-        free(args->conn->pcb.ip->path->path);
-        free(args->conn->pcb.ip->path);
-    }
+    spath_t *p = args->conn->pcb.ip->path;
     netconn_close(args->conn);
     netconn_delete(args->conn);
     free(args);
+    if (p != NULL){
+        free(p->path);
+        free(p);
+    }
     //smth missing?
 }
 
@@ -299,6 +301,7 @@ void *sock_thread(void *data){
     else if (rc == 0) {
         printf("EOF\n");
         // clean here
+        // FIXME(PSz): crashes after RST ACK
         handle_close(args);
     }
     return;
