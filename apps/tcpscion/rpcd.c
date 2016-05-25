@@ -174,7 +174,22 @@ void handle_accept(struct conn_args *args, char *buf, int len){
         return;
     }
     // Letting know that new thread is ready.
-    write(args->fd, "ACCEOK", RESP_SIZE);
+    u16_t tot_len, path_len = newconn->pcb.ip->path->len;
+    u8_t haddr_len = get_haddr_len(newconn->pcb.ip->remote_ip.type);
+    tot_len = RESP_SIZE + 2 + path_len + 1 + 4 + haddr_len;
+
+    u8_t tmp[tot_len], *p;
+    p = tmp;
+    memcpy(p, "ACCEOK", RESP_SIZE);
+    p += RESP_SIZE;
+    *((u16_t *)(p)) = path_len;
+    p += 2;
+    memcpy(p, newconn->pcb.ip->path->path, path_len);
+    p += path_len;
+    p[0] = newconn->pcb.ip->remote_ip.type;
+    p++;
+    memcpy(p, newconn->pcb.ip->remote_ip.addr, 4 + haddr_len);
+    write(args->fd, tmp, tot_len);
     write(new_fd, "ACCEOK", RESP_SIZE); // TODO: return addr + path? here
 }
 

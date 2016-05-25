@@ -99,8 +99,9 @@ class SCIONSocket(object):
         req = b"ACCE" + self.lwip_accept.getsockname()[-36:].encode('ascii')
         self._to_lwip(req)
         rep = self._from_lwip()
-        if rep != b"ACCEOK":
+        if rep[:6] != b"ACCEOK":
             raise error("accept() failed (old sock): %s" % rep)
+        print("OK, path, addr", rep)
         new_sock, _ = self.lwip_accept.accept()
         rep = new_sock.recv(self.BUFLEN)
         if rep != b"ACCEOK":
