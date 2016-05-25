@@ -257,12 +257,13 @@ void handle_close(struct conn_args *args){
     netconn_close(args->conn);
     netconn_delete(args->conn);
     free(args);
-    if (p != NULL){
-// FIXME(PSz): This breaks FIN_ACK in current env. Should be ok with real
-// packets passing, or just implement free in tcp_pcb_remove()
-        /* free(p->path); */
-        /* free(p); */
-    }
+//TODO(PSz): that is freed in tcp_pcb_remove(), check it with standard packet
+//passing.
+    /* if (p != NULL){ */
+    /*     fprintf(stderr, "Freeing path in handle_close()\n"); */
+    /*     free(p->path); */
+    /*     free(p); */
+    /* } */
     //smth missing?
 }
 
