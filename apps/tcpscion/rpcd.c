@@ -98,11 +98,11 @@ void handle_connect(struct conn_args *args, char *buf, int len){
     p += 2; // skip path_len
 
     // add path to TCP/IP state
-    spath_t *spath = malloc(sizeof *spath);
-    spath->path = malloc(path_len);
-    memcpy(spath->path, p, path_len);
-    spath->len = path_len;
-    args->conn->pcb.ip->path = spath;
+    spath_t *path = malloc(sizeof *path);
+    path->path = malloc(path_len);
+    memcpy(path->path, p, path_len);
+    path->len = path_len;
+    args->conn->pcb.ip->path = path;
     fprintf(stderr, "Path added, len %d\n", path_len);
 
     p += path_len; // skip path
@@ -258,8 +258,10 @@ void handle_close(struct conn_args *args){
     netconn_delete(args->conn);
     free(args);
     if (p != NULL){
-        free(p->path);
-        free(p);
+// FIXME(PSz): This breaks FIN_ACK in current env. Should be ok with real
+// packets passing, or just implement free in tcp_pcb_remove()
+        /* free(p->path); */
+        /* free(p); */
     }
     //smth missing?
 }
