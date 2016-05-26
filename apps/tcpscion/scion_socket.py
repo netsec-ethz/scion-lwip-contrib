@@ -98,10 +98,19 @@ class SCIONSocket(object):
         self.lwip_accept.listen(5)  # should be consistent with LWIP's backlog
         req = b"ACCE" + self.lwip_accept.getsockname()[-36:].encode('ascii')
         self._to_lwip(req)
+
         rep = self._from_lwip()
         if rep[:6] != b"ACCEOK":
             raise error("accept() failed (old sock): %s" % rep)
-        print("OK, path, addr", rep)
+        print("path, addr", rep)
+        rep = rep[6:]
+        path_len, = struct.unpack("H", rep[:2])
+        rep = rep[2:]
+        # TODO(PSz): instantiate path
+        path = rep[:path_len]
+        rep = rep[path_len:]
+        addr = SCIONAddr((rep[0], rep[1:]))
+
         new_sock, _ = self.lwip_accept.accept()
         rep = new_sock.recv(self.BUFLEN)
         if rep != b"ACCEOK":
@@ -110,7 +119,7 @@ class SCIONSocket(object):
         sock = SCIONSocket(self.family, self.type_, self.proto, name="NEW_ACC%s"
                            % time.time())
         sock.lwip_sock = new_sock
-        return sock, None # addr + path (maybe?)
+        return sock, addr, path
 
     def _init_accept_sock(self):
         if self.lwip_accept:
@@ -189,7 +198,8 @@ def server():
     s.bind((addr, 5000))
     s.listen()
     while True:
-        new_sock, addr = s.accept()
+        new_sock, addr, path = s.accept()
+        print("Accepted from addr and path:", addr, path)
         new_sock.send(MSG)
         new_sock.close()
 
