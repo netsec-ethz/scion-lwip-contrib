@@ -2,20 +2,27 @@ import socket as stdsock # To avoid name collision
 import struct
 import time
 from lib.packet.host_addr import haddr_parse
+from lib.packet.scion import SVCType
 from lib.packet.scion_addr import ISD_AS, SCIONAddr
 import uuid
 import os
+
+# TODO(PSz): that should go somewhere to the SCION python's lib:
+SVC_BS = 0
+SVC_PS = 1
+SVC_CS = 2
+SVC_SB = 3
+NO_SVC = 0xff  # No service associated with the socket
 
 # unix socket is created when tcp socket is created, i.e., socket() or accept()
 
 LWIP_SOCK_DIR = "/run/shm/lwip/"
 RPCD_SOCKET = "/run/shm/lwip/lwip"
 AF_SCION = 3  # TODO(PSz): double check
-SOCK_STREAM = 1  # ditto
+SOCK_STREAM = stdsock.SOCK_STREAM
 MAX_MSG_LEN = 2**32  # u32_t is used as size_t at rpcd
 CMD_SIZE = 4
 RESP_SIZE = CMD_SIZE + 2  # either "OK" or "ER" is appended
-NO_SVC = 0xff  # No service associated with the socket
 
 class error(stdsock.error):
     pass
@@ -102,7 +109,7 @@ class SCIONSocket(object):
         rep = self._from_lwip()
         if rep[:6] != b"ACCEOK":
             raise error("accept() failed (old sock): %s" % rep)
-        print("path, addr", rep)
+        print(self.name, "path, addr", rep)
         rep = rep[6:]
         path_len, = struct.unpack("H", rep[:2])
         rep = rep[2:]
@@ -195,7 +202,7 @@ def server():
     print("server running")
     s = socket(AF_SCION, SOCK_STREAM, name='SERVER')
     addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
-    s.bind((addr, 5000))
+    s.bind((addr, 5000), svc=SVC_PS)
     s.listen()
     while True:
         new_sock, addr, path = s.accept()
@@ -206,7 +213,8 @@ def server():
 def client():
     print("client running")
     s = socket(AF_SCION, SOCK_STREAM, name='CLIENT%s' % time.time())
-    addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
+    addr = SCIONAddr.from_values(ISD_AS("1-2"), SVCType.PS)
+    # addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
     s.connect((addr, 5000))
     tmp = b''
     while len(tmp) != MSG_SIZE:
