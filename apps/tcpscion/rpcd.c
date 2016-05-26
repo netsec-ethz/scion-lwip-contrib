@@ -108,6 +108,8 @@ void handle_connect(struct conn_args *args, char *buf, int len){
     p += path_len; // skip path
     scion_addr_raw(&addr, p[0], p + 1);
     print_scion_addr(&addr);
+    if (p[0] == ADDR_SVC_TYPE)
+        args->conn->pcb.ip->svc = ntohs(*(u16_t*)(p + 5)); // set svc for TCP/IP context
     if (netconn_connect(args->conn, &addr, port) != ERR_OK){
         write(args->fd, "CONNER", RESP_SIZE);
         perror("handle_connect() error at netconn_connect()\n");

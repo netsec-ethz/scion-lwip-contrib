@@ -215,7 +215,8 @@ def client():
     s = socket(AF_SCION, SOCK_STREAM, name='CLIENT%s' % time.time())
     addr = SCIONAddr.from_values(ISD_AS("1-2"), SVCType.PS)
     # addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
-    s.connect((addr, 5000))
+    # s.connect((addr, 5000))
+    s.connect((addr, 0)) # SVC does not have a port specified
     tmp = b''
     while len(tmp) != MSG_SIZE:
         tmp += s.recv(1024)
