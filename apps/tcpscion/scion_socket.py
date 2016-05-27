@@ -7,7 +7,7 @@ from lib.packet.scion_addr import ISD_AS, SCIONAddr
 import uuid
 import os
 
-# TODO(PSz): that should go somewhere to the SCION python's lib:
+# TODO(PSz): that should be somewhere in the SCION python's lib:
 SVC_BS = 0
 SVC_PS = 1
 SVC_CS = 2
@@ -82,7 +82,7 @@ class SCIONSocket(object):
             raise error("socket() failed: %s" % rep)
 
     def _to_lwip(self, req):
-        print(self.name, "Sending to LWIP:", req)
+        print(self.name, "Sending to LWIP(%dB):" % len(req), req[:20])
         self.lwip_sock.sendall(req)  # TODO(PSz): we may consider send(). For
         # now assuming that local socket is able to transfer req.
 
@@ -90,7 +90,7 @@ class SCIONSocket(object):
         if buflen is None:
             buflen=self.BUFLEN
         rep = self.lwip_sock.recv(buflen)  # read in a loop
-        print(self.name, "Reading from LWIP:", rep)
+        print(self.name, "Reading from LWIP(%dB):" % len(rep), rep[:20])
         return rep
 
     def listen(self): # w/o backlog for now, let's use LWIP's default
@@ -196,13 +196,16 @@ def socket(family, type_, proto=0, name=''):
 # Test
 import threading
 import time
-MSG_SIZE = 8000
+MSG_SIZE = 10000
 MSG = b"A"*MSG_SIZE
-def server():
+def server(svc=False):
     print("server running")
     s = socket(AF_SCION, SOCK_STREAM, name='SERVER')
-    addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
-    s.bind((addr, 5000), svc=SVC_PS)
+    addr = SCIONAddr.from_values(ISD_AS("1-1"), haddr_parse(1, "1.1.1.1"))
+    if svc:
+        s.bind((addr, 6000), svc=SVC_PS)
+    else:
+        s.bind((addr, 5000))
     s.listen()
     while True:
         new_sock, addr, path = s.accept()
@@ -210,25 +213,30 @@ def server():
         new_sock.send(MSG)
         new_sock.close()
 
-def client():
+def client(svc=False, N=0):
     print("client running")
-    s = socket(AF_SCION, SOCK_STREAM, name='CLIENT%s' % time.time())
-    addr = SCIONAddr.from_values(ISD_AS("1-2"), SVCType.PS)
-    # addr = SCIONAddr.from_values(ISD_AS("1-2"), haddr_parse(1, "127.0.0.1"))
-    # s.connect((addr, 5000))
-    s.connect((addr, 0)) # SVC does not have a port specified
+    s = socket(AF_SCION, SOCK_STREAM, name='CLIENT%s-%d' % (time.time(), N))
+    caddr = SCIONAddr.from_values(ISD_AS("2-2"), haddr_parse(1, "2.2.2.2"))
+    s.bind((caddr, 0))
+    if svc:
+        saddr = SCIONAddr.from_values(ISD_AS("1-1"), SVCType.PS)
+        s.connect((saddr, 0)) # SVC does not have a port specified
+    else:
+        saddr = SCIONAddr.from_values(ISD_AS("1-1"), haddr_parse(1, "1.1.1.1"))
+        s.connect((saddr, 5000))
     tmp = b''
     while len(tmp) != MSG_SIZE:
         tmp += s.recv(1024)
-    print(s.name, "MSG received:", len(tmp))
+    print(s.name, "MSG received, len, svc", len(tmp), svc)
     s.close()
 
-threading.Thread(target=server).start()
-while True:
-    input()
+threading.Thread(target=server, args=[False]).start()
+threading.Thread(target=server, args=[True]).start()
+for i in range(1000):
+    # input()
     print("\n\n")
-# for i in range(10000):
-#     time.sleep(0.005)
-    threading.Thread(target=client).start()
-    # print(i)
-
+    time.sleep(0.5)
+    # threading.Thread(target=client, args=[False, i]).start()
+    client(False, i)
+    client(True, i)
+print("DONE")

@@ -113,6 +113,9 @@ void handle_connect(struct conn_args *args, char *buf, int len){
     if (netconn_connect(args->conn, &addr, port) != ERR_OK){
         write(args->fd, "CONNER", RESP_SIZE);
         perror("handle_connect() error at netconn_connect()\n");
+        // FIXME(PSz): check does failing netconn_connect() free this.
+        /* free(path->path); */
+        /* free(path); */
         return;
     }
     write(args->fd, "CONNOK", RESP_SIZE);
@@ -266,6 +269,7 @@ void handle_recv(struct conn_args *args){
     memcpy(msg + RESP_SIZE + 2, data, len);
     write(args->fd, msg, len + RESP_SIZE + 2);  // err handling
     free(msg);
+    netbuf_free(buf);
 }
 
 void handle_close(struct conn_args *args){
