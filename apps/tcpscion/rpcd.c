@@ -274,9 +274,10 @@ void handle_recv(struct conn_args *args){
 
 void handle_close(struct conn_args *args){
     close(args->fd);
-    spath_t *p = args->conn->pcb.ip->path;
+    /* spath_t *p = args->conn->pcb.ip->path; */
     netconn_close(args->conn);
     netconn_delete(args->conn);
+    args->conn = NULL;
     free(args);
 //TODO(PSz): that is freed in tcp_pcb_remove(), check it with standard packet
 //passing.
