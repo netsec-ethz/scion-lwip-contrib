@@ -196,7 +196,7 @@ def socket(family, type_, proto=0, name=''):
 # Test
 import threading
 import time
-MSG_SIZE = 10000
+MSG_SIZE = 5000
 MSG = b"A"*MSG_SIZE
 def server(svc=False):
     print("server running")
@@ -232,11 +232,18 @@ def client(svc=False, N=0):
 
 threading.Thread(target=server, args=[False]).start()
 threading.Thread(target=server, args=[True]).start()
-for i in range(1000):
+time.sleep(0.5)
+start = time.time()
+for i in range(9999999999):
     # input()
     print("\n\n")
-    time.sleep(0.5)
+    # time.sleep(0.005)
     # threading.Thread(target=client, args=[False, i]).start()
-    client(False, i)
-    client(True, i)
+# Check its garbage colletion
+    # if not (i%500):
+    #     print("SLEEEEEPING\n")
+    #     time.sleep(1)
+    svc = (i % 2 == 0)
+    client(svc, i)
+    print("Time elapsed:", time.time()-start)
 print("DONE")

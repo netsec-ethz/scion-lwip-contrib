@@ -422,6 +422,7 @@
 #define UDP_DEBUG                       LWIP_DBG_ON
 #define TCP_INPUT_DEBUG                 LWIP_DBG_ON
 #define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
+// #define CHECKSUM_CHECK_TCP 0
 
 #define SCION 1
 

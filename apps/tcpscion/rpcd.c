@@ -269,7 +269,7 @@ void handle_recv(struct conn_args *args){
     memcpy(msg + RESP_SIZE + 2, data, len);
     write(args->fd, msg, len + RESP_SIZE + 2);  // err handling
     free(msg);
-    netbuf_free(buf);
+    netbuf_delete(buf);
 }
 
 void handle_close(struct conn_args *args){
