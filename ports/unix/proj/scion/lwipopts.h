@@ -412,5 +412,7 @@
 #define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
 
 #define SCION 1
+#define MEM_LIBC_MALLOC 1
+#define MEM_USE_POOLS 0
 
 #endif /* __LWIPOPTS_H__ */

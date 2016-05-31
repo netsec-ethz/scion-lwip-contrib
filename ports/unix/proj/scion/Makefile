@@ -45,7 +45,7 @@ CFLAGS=-g -Wall -DLWIP_DEBUG -fPIC
 CFLAGS:=$(CFLAGS) \
 	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/scion -I$(LWIPDIR) -I$(SCIONLIB) -I.
 
-COREFILES=$(LWIPDIR)/core/mem.c $(LWIPDIR)/core/memp.c $(LWIPDIR)/core/pbuf.c $(LWIPDIR)/core/sys.c \
+COREFILES=$(LWIPDIR)/core/memp.c $(LWIPDIR)/core/pbuf.c $(LWIPDIR)/core/sys.c \
 		$(LWIPDIR)/core/tcp.c $(LWIPDIR)/core/tcp_in.c $(LWIPDIR)/core/tcp_out.c $(LWIPDIR)/core/init.c \
         $(LWIPDIR)/core/def.c $(LWIPDIR)/core/timers.c
 
