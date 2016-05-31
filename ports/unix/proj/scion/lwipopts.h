@@ -362,7 +362,8 @@
  * TCP_MSS, IP header, and link header.
 *
  */
-#define PBUF_POOL_BUFSIZE               LWIP_MEM_ALIGN_SIZE(TCP_MSS+40+PBUF_LINK_HLEN)
+// PSz: with SCION, we don't need space for IP and link headers.
+#define PBUF_POOL_BUFSIZE               LWIP_MEM_ALIGN_SIZE(TCP_MSS+20)
 
 /*
    ------------------------------------
