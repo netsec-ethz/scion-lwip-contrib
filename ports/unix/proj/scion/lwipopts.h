@@ -78,12 +78,6 @@
  */
 #define MEM_ALIGNMENT                   4
 
-/**
- * MEM_SIZE: the size of the heap memory. If the application will send
- * a lot of data that needs to be copied, this should be set high.
- */
-#define MEM_SIZE                        65000
-
 /*
    ------------------------------------------------
    ---------- Internal Memory Pool Sizes ----------
@@ -341,7 +335,7 @@
  * link level header. The default is 14, the standard value for
  * Ethernet.
  */
-#define PBUF_LINK_HLEN                  16
+#define PBUF_LINK_HLEN                  0
 
 /**
  * PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. The default is
@@ -360,7 +354,7 @@
 /**
  * LWIP_HAVE_LOOPIF==1: Support loop interface (127.0.0.1) and loopif.c
  */
-#define LWIP_HAVE_LOOPIF                1
+#define LWIP_HAVE_LOOPIF                0
 
 /*
    ----------------------------------------------
@@ -414,5 +408,6 @@
 #define SCION 1
 #define MEM_LIBC_MALLOC 1
 #define MEM_USE_POOLS 0
+#define TCP_SND_BUF 1600
 
 #endif /* __LWIPOPTS_H__ */
