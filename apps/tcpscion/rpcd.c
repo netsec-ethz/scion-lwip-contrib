@@ -218,7 +218,6 @@ void handle_send(struct conn_args *args, char *buf, int len){
             write(args->fd, "SENDER", RESP_SIZE);
             return;
         }
-        // TODO(PSz) copying is probably unnecessary, try with NOCOPY
         if (netconn_write_partly(args->conn, p, len, NETCONN_COPY, &written) != ERR_OK){
             perror("handle_send() error at netconn_write()\n");
             printf("NETCONN PARTLY BROKEN: %d, %d, %d\n", len, written, size);

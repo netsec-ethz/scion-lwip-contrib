@@ -94,7 +94,7 @@
  * If the application sends a lot of data out of ROM (or other static memory),
  * this should be set high.
  */
-#define MEMP_NUM_PBUF                   MEGA
+#define MEMP_NUM_PBUF                   1600
 
 /**
  * MEMP_NUM_RAW_PCB: Number of raw connection PCBs
@@ -113,7 +113,7 @@
  * MEMP_NUM_TCP_PCB: the number of simulatenously active TCP connections.
  * (requires the LWIP_TCP option)
  */
-#define MEMP_NUM_TCP_PCB                MEGA
+#define MEMP_NUM_TCP_PCB                8
 
 /**
  * MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP connections.
@@ -151,13 +151,13 @@
  * MEMP_NUM_NETBUF: the number of struct netbufs.
  * (only needed if you use the sequential API, like api_lib.c)
  */
-#define MEMP_NUM_NETBUF                 MEGA
+#define MEMP_NUM_NETBUF                 8
 
 /**
  * MEMP_NUM_NETCONN: the number of struct netconns.
  * (only needed if you use the sequential API, like api_lib.c)
  */
-#define MEMP_NUM_NETCONN                MEGA
+#define MEMP_NUM_NETCONN                8
 
 /**
  * MEMP_NUM_TCPIP_MSG_API: the number of struct tcpip_msg, which are used
@@ -422,7 +422,6 @@
 #define UDP_DEBUG                       LWIP_DBG_ON
 #define TCP_INPUT_DEBUG                 LWIP_DBG_ON
 #define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
-// #define CHECKSUM_CHECK_TCP 0
 
 #define SCION 1
 
