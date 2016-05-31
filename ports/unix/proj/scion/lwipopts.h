@@ -76,13 +76,13 @@
  *    4 byte alignment -> #define MEM_ALIGNMENT 4
  *    2 byte alignment -> #define MEM_ALIGNMENT 2
  */
-#define MEM_ALIGNMENT                   1
+#define MEM_ALIGNMENT                   4
 
 /**
  * MEM_SIZE: the size of the heap memory. If the application will send
  * a lot of data that needs to be copied, this should be set high.
  */
-#define MEM_SIZE                        MEGA
+#define MEM_SIZE                        65000
 
 /*
    ------------------------------------------------
@@ -127,19 +127,6 @@
  */
 #define MEMP_NUM_TCP_SEG                16
 
-/**
- * MEMP_NUM_REASSDATA: the number of simultaneously IP packets queued for
- * reassembly (whole packets, not fragments!)
- */
-#define MEMP_NUM_REASSDATA              1
-
-/**
- * MEMP_NUM_ARP_QUEUE: the number of simulateously queued outgoing
- * packets (pbufs) that are waiting for an ARP request (to resolve
- * their destination address) to finish.
- * (requires the ARP_QUEUEING option)
- */
-#define MEMP_NUM_ARP_QUEUE              2
 
 /**
  * MEMP_NUM_SYS_TIMEOUT: the number of simulateously active timeouts.

@@ -196,7 +196,7 @@ def socket(family, type_, proto=0, name=''):
 # Test
 import threading
 import time
-MSG_SIZE = 5000
+MSG_SIZE = 1000
 MSG = b"A"*MSG_SIZE
 def server(svc=False):
     print("server running")

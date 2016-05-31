@@ -51,8 +51,27 @@ void handle_new_sock(int fd){
     args = malloc(sizeof *args);
     args->fd = fd;
     args->conn = conn;
+    // Create a detached thread.
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr)){
+        perror("Attribute init failed");
+        free(args);
+        write(fd, "NEWSER", RESP_SIZE);
+        return;
+    }
+    if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED)){
+        perror("Setting detached state failed");
+        free(args);
+        write(fd, "NEWSER", RESP_SIZE);
+        return;
+    }
+    if (pthread_create(&tid, &attr, &sock_thread, args)){
+        perror("handle_accept() error at pthread_create()\n");
+        free(args);
+        write(fd, "NEWSER", RESP_SIZE);
+        return;
+    }
     write(fd, "NEWSOK", RESP_SIZE);
-    pthread_create(&tid, NULL, &sock_thread, args);
 }
 
 void handle_bind(struct conn_args *args, char *buf, int len){
@@ -172,12 +191,28 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     pthread_t tid;
     new_args->fd = new_fd;
     new_args->conn = newconn;
-    if (pthread_create(&tid, NULL, &sock_thread, new_args)){
+
+    // Create a detached thread.
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr)){
+        perror("Attribute init failed");
+        free(new_args);
+        write(args->fd, "ACCEER", RESP_SIZE);
+        return;
+    }
+    if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED)){
+        perror("Setting detached state failed");
+        free(new_args);
+        write(args->fd, "ACCEER", RESP_SIZE);
+        return;
+    }
+    if (pthread_create(&tid, &attr, &sock_thread, new_args)){
         perror("handle_accept() error at pthread_create()\n");
         free(new_args);
         write(args->fd, "ACCEER", RESP_SIZE);
         return;
     }
+
     // Letting know that new thread is ready.
     u16_t tot_len, path_len = newconn->pcb.ip->path->len;
     u8_t haddr_len = get_haddr_len(newconn->pcb.ip->remote_ip.type);
@@ -262,30 +297,20 @@ void handle_recv(struct conn_args *args){
         return;
     }
 
-    char *msg = malloc(len + RESP_SIZE + 2);
+    char msg[len + RESP_SIZE + 2];
     memcpy(msg, "RECVOK", RESP_SIZE);
     *((u16_t *)(msg + RESP_SIZE)) = len;  // encode len
     memcpy(msg + RESP_SIZE + 2, data, len);
     write(args->fd, msg, len + RESP_SIZE + 2);  // err handling
-    free(msg);
     netbuf_delete(buf);
 }
 
 void handle_close(struct conn_args *args){
     close(args->fd);
-    /* spath_t *p = args->conn->pcb.ip->path; */
     netconn_close(args->conn);
     netconn_delete(args->conn);
     args->conn = NULL;
     free(args);
-//TODO(PSz): that is freed in tcp_pcb_remove(), check it with standard packet
-//passing.
-    /* if (p != NULL){ */
-    /*     fprintf(stderr, "Freeing path in handle_close()\n"); */
-    /*     free(p->path); */
-    /*     free(p); */
-    /* } */
-    //smth missing?
 }
 
 void *sock_thread(void *data){
@@ -340,17 +365,16 @@ int main() {
     }
 
     mkdir(LWIP_SOCK_DIR, 0755);
-
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, RPCD_SOCKET, sizeof(addr.sun_path)-1);
-
     unlink(RPCD_SOCKET);
 
     if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("bind error");
         exit(-1);
     }
+
     if (listen(fd, 5) == -1) {
         perror("listen error");
         exit(-1);
