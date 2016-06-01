@@ -1,3 +1,18 @@
+/*
+ * Copyright 2016 ETH Zurich
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 #include <stdio.h>
 #include <stdint.h>
 #include <sys/socket.h>
@@ -158,13 +173,8 @@ fail:
 void handle_accept(struct conn_args *args, char *buf, int len){
     int new_fd;
     char accept_path[strlen(LWIP_SOCK_DIR) + SOCK_PATH_LEN];
-    u8_t haddr_len, *tmp, *p;
-    u16_t tot_len, path_len;
-    struct conn_args *new_args;
-    struct netconn *newconn;
     struct sockaddr_un addr;
-    pthread_attr_t attr;
-    pthread_t tid;
+    struct netconn *newconn;
 
     printf("ACCE received\n");
     if (len != CMD_SIZE + SOCK_PATH_LEN){
@@ -194,6 +204,8 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     }
 
     // Create a detached thread.
+    pthread_attr_t attr;
+    pthread_t tid;
     if (pthread_attr_init(&attr)){
         perror("Attribute init failed");
         goto fail;
@@ -202,7 +214,7 @@ void handle_accept(struct conn_args *args, char *buf, int len){
         perror("Setting detached state failed");
         goto fail;
     }
-    new_args = malloc(sizeof *new_args);
+    struct conn_args *new_args = malloc(sizeof *new_args);
     new_args->fd = new_fd;
     new_args->conn = newconn;
     if (pthread_create(&tid, &attr, &sock_thread, new_args)){
@@ -212,7 +224,8 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     }
 
     // Letting know that new thread is ready.
-    path_len = newconn->pcb.ip->path->len;
+    u8_t *tmp, *p, haddr_len;
+    u16_t tot_len, path_len = newconn->pcb.ip->path->len;
     haddr_len = get_haddr_len(newconn->pcb.ip->remote_ip.type);
     tot_len = RESP_SIZE + 2 + path_len + 1 + 4 + haddr_len;
 

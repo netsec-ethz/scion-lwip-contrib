@@ -1,11 +1,31 @@
+# Copyright 2016 ETH Zurich
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+:mod:`scion_socket` --- SCION TCP socket.
+=========================================
+"""
+# Stdlib
+import os
 import socket as stdsock # To avoid name collision
 import struct
 import time
+import uuid
+
+# SCION
 from lib.packet.host_addr import haddr_parse
 from lib.packet.scion import SVCType
 from lib.packet.scion_addr import ISD_AS, SCIONAddr
-import uuid
-import os
 
 # TODO(PSz): that should be somewhere in the SCION python's lib:
 SVC_BS = 0
@@ -21,6 +41,7 @@ SOCK_STREAM = stdsock.SOCK_STREAM
 MAX_MSG_LEN = 2<<31  # u32_t is used as size_t at rpcd
 CMD_SIZE = 4
 RESP_SIZE = CMD_SIZE + 2  # either "OK" or "ER" is appended
+
 
 class error(stdsock.error):
     pass
@@ -75,6 +96,7 @@ class SCIONSocket(object):
         self._to_lwip(req)
         rep = self._from_lwip()
         if rep != b"NEWSOK":
+            self._lwip_sock.close()
             raise error("socket() failed: %s" % rep)
 
     def _to_lwip(self, req):
@@ -197,7 +219,7 @@ import threading
 import time
 import random
 # TODO(PSz): test with 0
-MSG_SIZE = None 
+MSG_SIZE = None
 MSG = None
 def set_MSG():
     global MSG_SIZE
@@ -243,7 +265,7 @@ threading.Thread(target=server, args=[True]).start()
 time.sleep(0.5)
 start = time.time()
 for i in range(9999999999):
-    input()
+    # input()
     print("\n\n")
     # time.sleep(0.005)
     # threading.Thread(target=client, args=[False, i]).start()
