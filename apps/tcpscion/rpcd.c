@@ -76,11 +76,10 @@ void handle_new_sock(int fd){
 
 void handle_bind(struct conn_args *args, char *buf, int len){
     ip_addr_t addr;
-    u16_t port;
-    u8_t svc;
+    u16_t port, svc;
     char *p = buf;
     printf("BIND received\n");
-    if ((len < CMD_SIZE + 4 + ADDR_NONE_LEN) || (len > CMD_SIZE + 4 + ADDR_IPV6_LEN)){
+    if ((len < CMD_SIZE + 5 + ADDR_NONE_LEN) || (len > CMD_SIZE + 5 + ADDR_IPV6_LEN)){
         write(args->fd, "BINDER", RESP_SIZE);
         perror("handle_bind() error on read\n");
         return;
@@ -89,8 +88,8 @@ void handle_bind(struct conn_args *args, char *buf, int len){
     p += CMD_SIZE; // skip "BIND"
     port = *((u16_t *)p);
     p += 2; // skip port
-    svc = p[0]; // SVC Address
-    p++; // skip svc
+    svc = *((u16_t *)p); // SVC Address
+    p += 2; // skip svc
     args->conn->pcb.ip->svc = svc; // set svc for TCP/IP context
     scion_addr_raw(&addr, p[0], p + 1);
     // TODO(PSz): test bind with addr = NULL

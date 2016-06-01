@@ -12,7 +12,7 @@ SVC_BS = 0
 SVC_PS = 1
 SVC_CS = 2
 SVC_SB = 3
-NO_SVC = 0xff  # No service associated with the socket
+NO_SVC = 0xffff  # No service associated with the socket
 
 # unix socket is created when tcp socket is created, i.e., socket() or accept()
 
@@ -35,7 +35,6 @@ class SCIONSocket(object):
     # MAX_TRY = 3 # max retries for init and create socket
     BUFLEN = 1024
 
-
     def __init__(self, family, type_, proto=0, name=''):
         assert family == AF_SCION
         assert type_ == SOCK_STREAM
@@ -51,7 +50,7 @@ class SCIONSocket(object):
     def bind(self, addr_port, svc=NO_SVC):
         addr, port = addr_port
         haddr_type = addr.host.TYPE
-        req = b"BIND" + struct.pack("HBB", port, svc, haddr_type) + addr.pack()
+        req = b"BIND" + struct.pack("HHB", port, svc, haddr_type) + addr.pack()
         self._to_lwip(req)
         rep = self._from_lwip()
         if rep != b"BINDOK":
@@ -196,8 +195,16 @@ def socket(family, type_, proto=0, name=''):
 # Test
 import threading
 import time
-MSG_SIZE = 50000
-MSG = b"A"*MSG_SIZE
+import random
+# TODO(PSz): test with 0
+MSG_SIZE = None 
+MSG = None
+def set_MSG():
+    global MSG_SIZE
+    global MSG
+    MSG_SIZE = random.randint(1, 500000)
+    MSG = b"A"*MSG_SIZE
+
 def server(svc=False):
     print("server running")
     s = socket(AF_SCION, SOCK_STREAM, name='SERVER')
@@ -210,6 +217,7 @@ def server(svc=False):
     while True:
         new_sock, addr, path = s.accept()
         print("Accepted from addr and path:", addr, path)
+        set_MSG()
         new_sock.send(MSG)
         new_sock.close()
 
