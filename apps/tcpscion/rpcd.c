@@ -21,10 +21,6 @@ struct conn_args{
     struct netconn *conn;
 };
 
-void get_default_addr(){
-    // get default ip_addr_t from sciond
-}
-
 void *sock_thread(void *data);
 void handle_new_sock(int fd){
     char buf[8];
@@ -131,9 +127,7 @@ void handle_connect(struct conn_args *args, char *buf, int len){
     if (netconn_connect(args->conn, &addr, port) != ERR_OK){
         write(args->fd, "CONNER", RESP_SIZE);
         perror("handle_connect() error at netconn_connect()\n");
-        // FIXME(PSz): check does failing netconn_connect() free this.
-        /* free(path->path); */
-        /* free(path); */
+        // Path is freed in tcp_pcb_remove()
         return;
     }
     write(args->fd, "CONNOK", RESP_SIZE);
@@ -229,7 +223,7 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     p++;
     memcpy(p, newconn->pcb.ip->remote_ip.addr, 4 + haddr_len);
     write(args->fd, tmp, tot_len);
-    write(new_fd, "ACCEOK", RESP_SIZE); // TODO: return addr + path? here
+    write(new_fd, "ACCEOK", RESP_SIZE); // confirm it is ok.
 }
 
 void handle_send(struct conn_args *args, char *buf, int len){
@@ -298,9 +292,9 @@ void handle_recv(struct conn_args *args){
 
     char msg[len + RESP_SIZE + 2];
     memcpy(msg, "RECVOK", RESP_SIZE);
-    *((u16_t *)(msg + RESP_SIZE)) = len;  // encode len
+    *((u16_t *)(msg + RESP_SIZE)) = len;
     memcpy(msg + RESP_SIZE + 2, data, len);
-    write(args->fd, msg, len + RESP_SIZE + 2);  // err handling
+    write(args->fd, msg, len + RESP_SIZE + 2);
     netbuf_delete(buf);
 }
 
@@ -342,14 +336,11 @@ void *sock_thread(void *data){
     }
     if (rc == -1) {
         // clean here
-        handle_close(args);
         perror("read");
-        exit(-1);
+        handle_close(args);
     }
     else if (rc == 0) {
         printf("EOF\n");
-        // clean here
-        // FIXME(PSz): crashes after RST ACK
         handle_close(args);
     }
     return;
