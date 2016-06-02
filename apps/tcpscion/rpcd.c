@@ -132,8 +132,8 @@ void handle_connect(struct conn_args *args, char *buf, int len){
 
     // add path to TCP/IP state
     spath_t *path = malloc(sizeof *path);
-    path->path = malloc(path_len);
-    memcpy(path->path, p, path_len);
+    path->raw_path = malloc(path_len);
+    memcpy(path->raw_path, p, path_len);
     path->len = path_len;
     args->conn->pcb.ip->path = path;
     fprintf(stderr, "Path added, len %d\n", path_len);
@@ -226,7 +226,7 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     // Letting know that new thread is ready.
     u8_t *tmp, *p, haddr_len;
     u16_t tot_len, path_len = newconn->pcb.ip->path->len;
-    haddr_len = get_haddr_len(newconn->pcb.ip->remote_ip.type);
+    haddr_len = get_addr_len(newconn->pcb.ip->remote_ip.type);
     tot_len = RESP_SIZE + 2 + path_len + 1 + 4 + haddr_len;
 
     tmp = malloc(tot_len);
@@ -235,7 +235,7 @@ void handle_accept(struct conn_args *args, char *buf, int len){
     p += RESP_SIZE;
     *((u16_t *)(p)) = path_len;
     p += 2;
-    memcpy(p, newconn->pcb.ip->path->path, path_len);
+    memcpy(p, newconn->pcb.ip->path->raw_path, path_len);
     p += path_len;
     p[0] = newconn->pcb.ip->remote_ip.type;
     p++;
