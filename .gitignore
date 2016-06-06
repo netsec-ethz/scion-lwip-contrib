@@ -2,5 +2,3 @@
 ports/unix/proj/scion/*.o
 ports/unix/proj/scion/*.so
 ports/unix/proj/scion/.depend
-apps/tcpscion/client
-apps/tcpscion/server
