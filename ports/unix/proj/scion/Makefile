@@ -49,6 +49,7 @@ LWIPARCH=$(CONTRIBDIR)/ports/unix
 
 #Set this to where you have the lwip core module checked out from CVS
 #default assumes it's a dir named lwip at the same level as the contrib module
+# TODO(PSz): change to sub/ after all parts are merged.
 LWIPDIR=$(CONTRIBDIR)/../scion-lwip/src
 
 SCIONLIB=$(CONTRIBDIR)/../scion/lib
@@ -71,8 +72,6 @@ APIFILES=$(LWIPDIR)/api/api_lib.c $(LWIPDIR)/api/api_msg.c $(LWIPDIR)/api/tcpip.
 
 # ARCHFILES: Architecture specific files.
 ARCHFILES=$(LWIPARCH)/sys_arch.c
-
-SCIONLIBFILES=$(SCIONLIB)/packet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=$(COREFILES) $(CORESCIONFILES) $(APIFILES) $(ARCHFILES)
