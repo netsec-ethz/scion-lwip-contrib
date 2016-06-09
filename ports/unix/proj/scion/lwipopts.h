@@ -56,14 +56,6 @@
 #define __LWIPOPTS_H__
 
 /*
- * Include user defined options first. Anything not defined in these files
- * will be set to standard values. Override anything you dont like!
- */
-#include "lwipopts.h"
-#include "lwip/debug.h"
-#define MEGA 0xfffff
-
-/*
    -----------------------------------------------
    ---------- Platform specific locking ----------
    -----------------------------------------------
@@ -340,8 +332,6 @@
  */
 #define LWIP_TCP                        1
 
-#define LWIP_LISTEN_BACKLOG             0
-
 /*
    ----------------------------------
    ---------- Pbuf options ----------
@@ -426,5 +416,6 @@
 #define MEM_LIBC_MALLOC 1
 #define MEM_USE_POOLS 0
 #define TCP_SND_BUF 1600
+#define LWIP_SO_RCVTIMEO                  1
 
 #endif /* __LWIPOPTS_H__ */
