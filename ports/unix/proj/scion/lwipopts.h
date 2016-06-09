@@ -412,7 +412,7 @@
 #define TCP_INPUT_DEBUG                 LWIP_DBG_ON
 #define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
 
-#define SCION 1
+#define SCION
 #define MEM_LIBC_MALLOC 1
 #define MEM_USE_POOLS 0
 #define TCP_SND_BUF 1600
