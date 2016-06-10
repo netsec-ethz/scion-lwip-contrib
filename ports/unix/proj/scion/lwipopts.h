@@ -403,8 +403,7 @@
  */
 #define PPP_SUPPORT                     0
 
-
-/* Misc */
+/* Very verbose debug for now. */
 #define TCP_DEBUG                       LWIP_DBG_ON
 #define PBUF_DEBUG                      LWIP_DBG_ON
 #define TCPIP_DEBUG                     LWIP_DBG_ON
@@ -412,10 +411,19 @@
 #define TCP_INPUT_DEBUG                 LWIP_DBG_ON
 #define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
 
+/* Enable SCION */
 #define SCION
-#define MEM_LIBC_MALLOC 1
-#define MEM_USE_POOLS 0
-#define TCP_SND_BUF 1600
-#define LWIP_SO_RCVTIMEO                  1
+
+/* Use glibc's malloc instead of LWIP's mem management. */
+#define MEM_LIBC_MALLOC                 1
+
+/* Do not use LWIP's memory pools. */
+#define MEM_USE_POOLS                   0
+
+/* Set larger (than default) sending buffer. */
+#define TCP_SND_BUF                     1600
+
+/* Enable recv() timeout */
+#define LWIP_SO_RCVTIMEO                1
 
 #endif /* __LWIPOPTS_H__ */
