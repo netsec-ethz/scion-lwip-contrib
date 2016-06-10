@@ -49,7 +49,11 @@ typedef struct sys_sem * sys_sem_t;
 
 struct sys_mbox;
 typedef struct sys_mbox *sys_mbox_t;
+#ifdef SCION
+#define sys_mbox_valid(mbox) (*(mbox) != NULL)
+#else
 #define sys_mbox_valid(mbox) (((mbox) != NULL) && (*(mbox) != NULL))
+#endif
 #define sys_mbox_set_invalid(mbox) do { if((mbox) != NULL) { *(mbox) = NULL; }}while(0)
 
 struct sys_thread;
