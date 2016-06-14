@@ -52,9 +52,9 @@ LWIPARCH=$(CONTRIBDIR)/ports/unix
 #Set this to where you have the lwip core module checked out from CVS
 #default assumes it's a dir named lwip at the same level as the contrib module
 # TODO(PSz): change to sub/ after all parts are merged.
-LWIPDIR=$(CONTRIBDIR)/../scion-lwip/src
+LWIPDIR=$(CONTRIBDIR)/../lwip/src
 
-SCIONLIB=$(CONTRIBDIR)/../scion/lib
+SCIONLIB=$(CONTRIBDIR)/../../lib
 
 CCDEP=gcc
 CC=gcc
