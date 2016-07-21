@@ -80,15 +80,17 @@ LWIPFILESW=$(wildcard $(LWIPFILES))
 LWIPOBJS=$(notdir $(LWIPFILESW:.c=.o))
 
 LWIPLIB=liblwip.so
+TARGETS=$(LWIPLIB)
+PREFIX?=/usr/local
 
 %.o:
 	$(CC) $(CFLAGS) -c $(<:.o=.c)
 
 all: $(LWIPLIB) 
-.PHONY: all
+.PHONY: all clean install uninstall
 
 clean:
-	rm -f *.o $(LWIPLIB) *.s .depend* *.core core
+	rm -f *.o *.so *.a *.s .depend* *.core core
 
 depend dep: .depend
 
@@ -99,3 +101,15 @@ $(LWIPLIB): $(LWIPOBJS) unixlib.o
 
 .depend: unixlib.c $(LWIPFILES)
 	$(CCDEP) $(CFLAGS) -MM $^ > .depend || rm -f .depend
+
+install: .installstamp
+
+.installstamp: $(TARGETS)
+	sudo cp $(TARGETS) $(PREFIX)/lib/
+	sudo ldconfig
+	touch .installstamp
+
+uninstall:
+	$(foreach var,$(TARGETS),sudo rm -f $(PREFIX)/lib/$(var);)
+	sudo ldconfig
+	rm -f .installstamp
