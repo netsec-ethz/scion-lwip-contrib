@@ -90,87 +90,6 @@
 #define MEM_ALIGNMENT                   4
 
 /*
-   ------------------------------------------------
-   ---------- Internal Memory Pool Sizes ----------
-   ------------------------------------------------
-*/
-/**
- * MEMP_NUM_PBUF: the number of memp struct pbufs (used for PBUF_ROM and PBUF_REF).
- * If the application sends a lot of data out of ROM (or other static memory),
- * this should be set high.
- */
-#define MEMP_NUM_PBUF                   1600
-
-/**
- * MEMP_NUM_RAW_PCB: Number of raw connection PCBs
- * (requires the LWIP_RAW option)
- */
-#define MEMP_NUM_RAW_PCB                0
-
-/**
- * MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
- * per active UDP "connection".
- * (requires the LWIP_UDP option)
- */
-#define MEMP_NUM_UDP_PCB                0
-
-/**
- * MEMP_NUM_TCP_PCB: the number of simulatenously active TCP connections.
- * (requires the LWIP_TCP option)
- */
-#define MEMP_NUM_TCP_PCB                4096
-
-/**
- * MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP connections.
- * (requires the LWIP_TCP option)
- */
-#define MEMP_NUM_TCP_PCB_LISTEN         2048
-
-/**
- * MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP segments.
- * (requires the LWIP_TCP option)
- */
-#define MEMP_NUM_TCP_SEG                16
-
-
-/**
- * MEMP_NUM_SYS_TIMEOUT: the number of simulateously active timeouts.
- * (requires NO_SYS==0)
- */
-#define MEMP_NUM_SYS_TIMEOUT            3
-
-/**
- * MEMP_NUM_NETBUF: the number of struct netbufs.
- * (only needed if you use the sequential API, like api_lib.c)
- */
-#define MEMP_NUM_NETBUF                 4096
-
-/**
- * MEMP_NUM_NETCONN: the number of struct netconns.
- * (only needed if you use the sequential API, like api_lib.c)
- */
-#define MEMP_NUM_NETCONN                4096
-
-/**
- * MEMP_NUM_TCPIP_MSG_API: the number of struct tcpip_msg, which are used
- * for callback/timeout API communication.
- * (only needed if you use tcpip.c)
- */
-#define MEMP_NUM_TCPIP_MSG_API          4096
-
-/**
- * MEMP_NUM_TCPIP_MSG_INPKT: the number of struct tcpip_msg, which are used
- * for incoming packets.
- * (only needed if you use tcpip.c)
- */
-#define MEMP_NUM_TCPIP_MSG_INPKT        4096
-
-/**
- * PBUF_POOL_SIZE: the number of buffers in the pbuf pool.
- */
-#define PBUF_POOL_SIZE                  4096
-
-/*
    ---------------------------------
    ---------- ARP options ----------
    ---------------------------------
@@ -418,6 +337,9 @@
 
 /* Use glibc's malloc instead of LWIP's mem management. */
 #define MEM_LIBC_MALLOC                 1
+
+/* Use glibc's malloc for mem pools management. */
+#define MEMP_MEM_MALLOC                 1
 
 /* Do not use LWIP's memory pools. */
 #define MEM_USE_POOLS                   0
