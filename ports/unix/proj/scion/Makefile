@@ -57,7 +57,7 @@ SCIONLIB=$(CONTRIBDIR)/../../lib
 
 CCDEP=gcc
 CC=gcc
-CFLAGS=-g -Wall -DLWIP_DEBUG -fPIC
+CFLAGS=-g -Wall -fPIC
 
 CFLAGS:=$(CFLAGS) \
 	-I$(LWIPDIR)/include -I$(LWIPARCH)/include -I$(LWIPDIR)/include/scion -I$(LWIPDIR)/include/ipv4 -I$(LWIPDIR) -I$(SCIONLIB) -I.
