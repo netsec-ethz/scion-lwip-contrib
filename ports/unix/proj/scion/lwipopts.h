@@ -350,7 +350,10 @@
 /* Enable recv() timeout */
 #define LWIP_SO_RCVTIMEO                1
 
-/* Enable SO_REUSEADDR and SO_REUSEPORT options */
-#define SO_REUSE 1
+/* Enable SO_REUSEADDR and SO_REUSEPORT options. */
+#define SO_REUSE                        1
+
+/* Enable SO_RCVBUF processing. */
+#define LWIP_SO_RCVBUF                  1
 
 #endif /* __LWIPOPTS_H__ */
