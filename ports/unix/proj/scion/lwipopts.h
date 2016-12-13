@@ -253,6 +253,13 @@
  */
 #define LWIP_TCP                        1
 
+/* TCP settings */
+#define TCP_MSS                         1400
+#define TCP_WND                         (4*TCP_MSS)
+#define TCP_SND_BUF                     65535
+#define TCP_OVERSIZE                    TCP_MSS
+#define TCP_SND_QUEUELEN                512
+
 /*
    ----------------------------------
    ---------- Pbuf options ----------
@@ -343,9 +350,6 @@
 
 /* Do not use LWIP's memory pools. */
 #define MEM_USE_POOLS                   0
-
-/* Set larger (than default) sending buffer. */
-#define TCP_SND_BUF                     1600
 
 /* Enable recv() timeout */
 #define LWIP_SO_RCVTIMEO                1
