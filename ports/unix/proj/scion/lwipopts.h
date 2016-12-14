@@ -253,6 +253,16 @@
  */
 #define LWIP_TCP                        1
 
+/**
+ * TCP_MSS: TCP Maximum segment size. Increased from the default one (536).
+ */
+#define TCP_MSS                         1400
+
+/**
+ * TCP_SND_BUF: TCP sender buffer space (bytes). The default is (2 * TCP_MSS).
+ */
+#define TCP_SND_BUF                     (16 * TCP_MSS)
+
 /*
    ----------------------------------
    ---------- Pbuf options ----------
@@ -343,9 +353,6 @@
 
 /* Do not use LWIP's memory pools. */
 #define MEM_USE_POOLS                   0
-
-/* Set larger (than default) sending buffer. */
-#define TCP_SND_BUF                     1600
 
 /* Enable recv() timeout */
 #define LWIP_SO_RCVTIMEO                1
