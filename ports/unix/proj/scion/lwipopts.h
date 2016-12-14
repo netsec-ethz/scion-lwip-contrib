@@ -253,12 +253,15 @@
  */
 #define LWIP_TCP                        1
 
-/* TCP settings */
+/**
+ * TCP_MSS: TCP Maximum segment size. Increased from the default one (536).
+ */
 #define TCP_MSS                         1400
-#define TCP_WND                         (4*TCP_MSS)
-#define TCP_SND_BUF                     65535
-#define TCP_OVERSIZE                    TCP_MSS
-#define TCP_SND_QUEUELEN                512
+
+/**
+ * TCP_SND_BUF: TCP sender buffer space (bytes). The default is (2 * TCP_MSS).
+ */
+#define TCP_SND_BUF                     (16 * TCP_MSS)
 
 /*
    ----------------------------------
