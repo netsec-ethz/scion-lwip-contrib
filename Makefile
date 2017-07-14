@@ -1,8 +1,8 @@
 all:
-	make -C ./ports/unix/proj/scion
+	$(MAKE) -C ./ports/unix/proj/scion
 clean:
-	make -C ./ports/unix/proj/scion clean
+	$(MAKE) -C ./ports/unix/proj/scion clean
 install:
-	make -C ./ports/unix/proj/scion install
+	$(MAKE) -C ./ports/unix/proj/scion install
 uninstall:
-	make -C ./ports/unix/proj/scion uninstall
+	$(MAKE) -C ./ports/unix/proj/scion uninstall
