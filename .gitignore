@@ -1,6 +1,6 @@
-# Created by `make`
+.*.sw?
+ports/unix/proj/scion/*.a
 ports/unix/proj/scion/*.o
 ports/unix/proj/scion/*.so
 ports/unix/proj/scion/.depend
 ports/unix/proj/scion/.installstamp
-.*.sw?
