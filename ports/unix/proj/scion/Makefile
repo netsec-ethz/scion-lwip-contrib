@@ -79,14 +79,15 @@ LWIPFILES=$(COREFILES) $(CORESCIONFILES) $(APIFILES) $(ARCHFILES)
 LWIPFILESW=$(wildcard $(LWIPFILES))
 LWIPOBJS=$(notdir $(LWIPFILESW:.c=.o))
 
-LWIPLIB=liblwip.so
-TARGETS=$(LWIPLIB)
+DYNAMIC=liblwip.so
+STATIC=liblwip.a
+TARGETS=$(DYNAMIC) $(STATIC)
 PREFIX?=/usr/local
 
 %.o:
 	$(CC) $(CFLAGS) -c $(<:.o=.c)
 
-all: $(LWIPLIB)
+all: $(TARGETS)
 .PHONY: all clean install uninstall
 
 clean:
@@ -96,8 +97,11 @@ depend dep: .depend
 
 include .depend
 
-$(LWIPLIB): $(LWIPOBJS) unixlib.o
+$(DYNAMIC): $(LWIPOBJS) unixlib.o
 	$(CC) -g -nostartfiles -shared -o $@ $^
+
+$(STATIC): $(LWIPOBJS) unixlib.o
+	 ar rcs $@ $^
 
 .depend: unixlib.c $(LWIPFILES)
 	$(CCDEP) $(CFLAGS) -MM $^ > .depend || rm -f .depend
